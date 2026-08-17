@@ -1,0 +1,27 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Corazon Verde del Chaco - approximate AOI",
+        "source": "Hand-digitized bounding box from Figure 2.2 (Corazon Verde del Chaco Project Description, VCS 2611, Quadriz, 2023-02-28)",
+        "precision": "approximate",
+        "note": "No public KML/shapefile found for the real project boundary. This bounding box was read visually off the georeferenced map in the official PD and cross-checked against the PD's stated Initial Project Area (20,515.0 ha) - see data/study_area/README.md.",
+        "created": "2026-08-13"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-58.45, -22.5],
+            [-58.366667, -22.5],
+            [-58.366667, -22.283333],
+            [-58.45, -22.283333],
+            [-58.45, -22.5]
+          ]
+        ]
+      }
+    }
+  ]
+}

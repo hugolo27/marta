@@ -1,0 +1,44 @@
+schema: spec-driven
+
+# Project context (optional)
+# This is shown to AI when creating artifacts.
+# Add your tech stack, conventions, style guides, domain knowledge, etc.
+context: |
+  MARTA — Final Master's Project (FP-UNA, MIAyCD). A satellite verification
+  pipeline for the REDD+ carbon credit market in the Paraguayan Chaco: land cover classification
+  (forest/pasture/clearing/crop) with a CNN over Sentinel-2, ground truth from MapBiomas Chaco,
+  Grad-CAM interpretability for auditability, feeding into a calibrated carbon/CO2 estimate.
+  Core scope (see docs/FOUNDATION.md): dataset build, multiband CNN, Random Forest baseline,
+  temporal change comparison, Grad-CAM, carbon estimation (pretrained canopy height inference +
+  GEDI L4A calibration + IPCC biomass->carbon->CO2e conversion, including root-to-shoot factor),
+  quantitative/qualitative evaluation, end-to-end prototype, an audit demo against a real
+  registered project (Corazon Verde del Chaco, VCS 2611). Carbon estimation is core, not an
+  optional extension. The CNN+Grad-CAM classifier is the change-detection mechanism that feeds
+  the carbon pipeline, not a separate track.
+  Formula chain: AGBD = a*H^b (log-log regression vs GEDI L4A) -> AGB_total = AGBD*(1+R)
+  (root-to-shoot, R ~0.20-0.24) -> Carbon = AGB_total*0.47 -> CO2e = Carbon*3.67.
+  Out of scope: replacing VVB auditors, national-scale monitoring, the full SaaS product
+  (Airbyte ingestion, Metabase dashboard, third-party API), own field validation, carbon pools
+  beyond above/belowground biomass (deadwood, litter, soil organic carbon).
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing
