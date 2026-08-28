@@ -13,11 +13,14 @@ env/
 .ipynb_checkpoints/
 .env
 .env.*
+!.env.example
 *credentials*.json
 service-account*.json
 .config/earthengine/
 data/*
 !data/study_area
+data/study_area/*.png
+data/study_area/dataset/
 *.tif
 *.tiff
 *.nc
@@ -33,3 +36,6 @@ mlruns/
 .claude/
 CLAUDE.md
 research_docs/
+docs/PIPELINE.md
+docs/PIPELINE_SIMPLE.md
+profe.jpeg
