@@ -22,6 +22,7 @@ The system works at the land-cover level over 10m pixels (area/hectares), not at
 - Whether a CNN meaningfully outperforms a simpler Random Forest baseline on this classification task — a negative result here is a valid finding, not a failure of the project.
 - Whether Grad-CAM heatmaps hold up as coherent, useful audit evidence on this specific data. Interpretability methods are typically validated on different conditions than the Chaco's dry, dispersed vegetation, so this isn't assumed to transfer cleanly.
 - Whether a satellite-calibrated carbon estimate (pretrained canopy height + GEDI) produces a defensible number for a real registered project, given known biases in the underlying models for low-canopy vegetation.
+- Whether a spatiotemporal deep learning model meaningfully outperforms a classical CA-Markov baseline at predicting future land cover change — the same "does the added complexity earn its keep" test applied to the predictive extension (see point 10 below), mirroring the CNN vs. Random Forest comparison.
 
 ## General objective
 
@@ -31,7 +32,7 @@ Evaluate a candidate satellite verification pipeline for the carbon credit marke
 
 The components below make up the approach being tested, not a finished system presented as validated. Each has an explicit evaluation step, because its suitability for this specific data — Chaco vegetation, one credit type, one case study — isn't established yet.
 
-1. **Dataset:** Sentinel-2 imagery + MapBiomas Chaco as ground truth, over a bounded study area. Case study: Corazón Verde del Chaco (VCS 2611), a real registered REDD+ project — chosen because it lets the audit approach be validated against real, publicly claimed figures, not because the method is REDD+-specific. Approximate boundary (see `openspec/changes/phase1-define-study-area/`), pending a GEDI feasibility check and tutor sign-off.
+1. **Dataset:** Sentinel-2 imagery + MapBiomas Chaco as ground truth, over a bounded study area. Case study: Corazón Verde del Chaco (VCS 2611), a real registered REDD+ project — chosen because it lets the audit approach be validated against real, publicly claimed figures, not because the method is REDD+-specific. Approximate boundary (see `openspec/changes/phase1-define-study-area/`), confirmed by the tutor, GEDI feasibility check passed.
 2. **Classification candidate:** a CNN adapted to Sentinel-2's 13 spectral bands (not just RGB), with spectral indices (NDVI and similar) as additional channels — evaluated against the baseline below, not assumed superior by default.
 3. **Baseline:** Random Forest on spectral features, run specifically to test whether the CNN's added complexity is justified.
 4. **Temporal comparison:** classify two or more points in time and produce a change map (hectares that moved from forest to another class) — the change-detection mechanism, independent of which classifier from points 2–3 performs better.
@@ -43,6 +44,11 @@ The components below make up the approach being tested, not a finished system pr
 7. **Evaluation:** quantitative (accuracy, IoU/Dice, confusion matrix, CNN vs. baseline comparison) and qualitative (whether Grad-CAM heatmaps actually align with known change, height-biomass fit quality via cross-validation) — this is where points 2 and 5 get an actual answer, not just a stated intention.
 8. **Functional prototype of the full flow:** satellite image → classification → temporal comparison → heatmap → associated CO2 estimate, presentable at the symposium regardless of which specific model choices hold up.
 9. **Audit demo (case study):** run the full pipeline over Corazón Verde del Chaco and compare satellite-observed hectares/CO2 against what's claimed in its public documentation. This validates the over-issuance problem for this one project as a case study — not a general claim about the REDD+ market as a whole.
+10. **Predictive extension (candidate, new relative to the tutor's originally documented 6-phase methodology, pending confirmation):** beyond validating past change (points 3-4-6-9, all retrospective), forecast future land cover change and its associated projected CO2e for the study area, using the same "baseline vs. candidate" evaluation posture as points 2-3:
+    - **Baseline:** CA-Markov — a Markov transition matrix (historical class-change frequency, from a multi-year MapBiomas series) combined with a cellular automaton that allocates that change to specific pixels using neighborhood rules and a suitability map (driver layers such as roads, distance to already-cleared edges, terrain, land tenure). Interpretable by construction — the transition matrix and suitability weights are themselves the explanation, no separate interpretability layer needed.
+    - **Candidate:** a spatiotemporal deep learning model (ConvLSTM or 3D-CNN) over the stacked multi-year maps, evaluated against the CA-Markov baseline via backtesting (train on years 1..N-1, predict a known year N, score with Figure of Merit/Kappa) — not assumed superior by default, same posture as point 2 vs. point 3.
+    - The projected CO2e figure reuses the historical carbon-density-per-transition-type numbers already computed for observed change (points 4-6), applied to the pixels either model predicts will change — it does not require synthetic future imagery or re-running canopy-height inference.
+    - **Open item:** this extension was proposed by the tutor in conversation, but isn't part of his originally documented methodology (`research_docs/METODOLOGIA_TUTOR_RODRIGO_PARRA.md`, which is entirely retrospective/stock-based). Whether it's a required core component or an optional one is still pending explicit confirmation.
 
 ### Validation (if data becomes available)
 
@@ -67,11 +73,13 @@ Grad-CAM, even if its heatmaps prove coherent on this data, wouldn't detect frau
 
 ## Scope
 
-**Included:** CNN classification over a bounded area of the Chaco evaluated against a Random Forest baseline, Grad-CAM evaluated qualitatively as an audit mechanism, a GEDI-calibrated carbon/CO2 estimate, an audit demo against one real registered project, a functional/demonstrable prototype, a document and defense following the standard graduate program structure.
+**Included:** CNN classification over a bounded area of the Chaco evaluated against a Random Forest baseline, Grad-CAM evaluated qualitatively as an audit mechanism, a GEDI-calibrated carbon/CO2 estimate, a predictive extension (CA-Markov baseline vs. spatiotemporal deep learning candidate, see point 10 above — pending confirmation on whether it's required core or optional), an audit demo against one real registered project, a functional/demonstrable prototype, a document and defense following the standard graduate program structure.
 
-**Out of scope:** replacing the VVB auditor or producing a legally valid report before Verra, processing the entire Chaco or building a national real-time monitoring system, building the full SaaS product (automatic ingestion, dashboard, third-party API), original field work for in-situ validation, carbon pools beyond above/belowground biomass (deadwood, litter, and soil carbon are excluded and documented as a limitation).
+**Out of scope:** replacing the VVB auditor or producing a legally valid report before Verra, processing the entire Chaco or building a national real-time monitoring system, building the full SaaS product (automatic ingestion, dashboard, third-party API, arbitrary user-drawn polygons anywhere in the region), original field work for in-situ validation, carbon pools beyond above/belowground biomass (deadwood, litter, and soil carbon are excluded and documented as a limitation).
 
 The cut to REDD+ and to one case-study project is a scope decision made to keep the TFM achievable in the available time — not a claim that the classification and carbon-estimation approach only works for REDD+. Whether it generalizes to other credit types or regions is explicitly untested and left as future work.
+
+**On generalization within the Chaco specifically:** the case-study demo (point 9) is fixed to one AOI, but that's a scope decision about the *demo*, not a hard technical ceiling on the *model*. The classifier's training sample and the GEDI calibration sample are deliberately drawn from a footprint wider than the single case-study AOI (MapBiomas and GEDI both have Chaco-wide coverage, not just over Corazón Verde del Chaco), so the trained pipeline is a candidate for generalizing to other areas within the Paraguayan Chaco — tested, not assumed, via a held-out sub-region accuracy check during evaluation (point 7), not by building the interactive multi-polygon tool that's explicitly out of scope above. Generalizing beyond the Paraguayan Chaco (other Chaco countries, other biomes) is untested and out of scope.
 
 ---
 

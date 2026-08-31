@@ -11,9 +11,9 @@
 
 ## 3. GEDI L4A feasibility check
 
-- [ ] 3.1 Stand up minimal one-off tooling to query GEDI L4A granules/footprints intersecting the AOI for a representative date range (e.g. NASA GEDI subsetter or `earthaccess`)
-- [ ] 3.2 Record footprint count, date range queried, and a qualitative read on data quality/density
-- [ ] 3.3 Decide go/no-go: if footprint density is too sparse for a regional calibration, widen the AOI or fall back to the alternate candidate (Chaco Vivo, VCS 3671) and redo tasks 1-3
+- [x] 3.1 Stand up minimal one-off tooling to query GEDI L4A granules/footprints intersecting the AOI for a representative date range (e.g. NASA GEDI subsetter or `earthaccess`) — `scripts/gedi_feasibility_check.py`, streams granules via `earthaccess.open()` + `h5py`, counts shots actually inside the AOI polygon (not just bbox-touching granules)
+- [x] 3.2 Record footprint count, date range queried, and a qualitative read on data quality/density — 39 granules (GEDI_L4A_AGB_Density V3, 2019-04 to 2023-03, full mission span) intersect the AOI bbox; 40,257 footprints fall inside the actual AOI polygon (20,589 ha), 3,823 pass `l4a_quality_flag_rel3` (~9.5% quality pass rate, consistent with FOUNDATION.md's noted low-canopy/dry-vegetation quality bias). Quality-passing density: ~18.6 footprints per 100 ha.
+- [x] 3.3 Decide go/no-go — **GO.** 3,823 quality-passing footprints over 20,589 ha is well above what a log-log height→biomass regression needs; no reason to widen the AOI or fall back to Chaco Vivo.
 
 ## 4. Documentation
 
@@ -22,4 +22,4 @@
 
 ## 5. Tutor sign-off
 
-- [ ] 5.1 Confirm the chosen area with the tutor, or capture their preferred alternative, before treating the AOI as final
+- [x] 5.1 Confirm the chosen area with the tutor, or capture their preferred alternative, before treating the AOI as final — confirmed by Parra, AOI is final
