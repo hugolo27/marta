@@ -36,6 +36,7 @@ mlruns/
 .claude/
 CLAUDE.md
 research_docs/
+context.md
 docs/PIPELINE.md
 docs/PIPELINE_SIMPLE.md
 profe.jpeg
