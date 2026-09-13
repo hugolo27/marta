@@ -1,6 +1,6 @@
 ## Why
 
-`phase1-classifier` (archived) produces per-date land cover predictions (bosque/pasto/cultivo) from a trained CNN, but nothing yet diffs two dates into a change map. MARTA's core thesis — auditable evidence for carbon-credit verification — needs to answer "did this pixel change between 2019 and 2023, and to what," not just "what is this pixel today." This is also a stated prerequisite for two already-scoped pieces of work: Grad-CAM needs a real detected change to explain rather than a static single-date classification, and Fase 2's carbon estimation needs to know which pixels transitioned and how, to apply a carbon-density delta per transition type.
+`phase1-classifier` (archived) produces per-date land cover predictions (bosque/pasto/cultivo) from a trained CNN, but nothing yet diffs two dates into a change map. The project's core thesis — auditable evidence for carbon-credit verification — needs to answer "did this pixel change between 2019 and 2023, and to what," not just "what is this pixel today." This is also a stated prerequisite for two already-scoped pieces of work: Grad-CAM needs a real detected change to explain rather than a static single-date classification, and Fase 2's carbon estimation needs to know which pixels transitioned and how, to apply a carbon-density delta per transition type.
 
 ## What Changes
 

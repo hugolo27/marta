@@ -240,7 +240,7 @@ WorldCover.
 estudio (AOI); evaluada contra 3 sub-áreas geográficamente independientes, gana o empata en 2 de
 las 3 y pierde claramente en la tercera (Filadelfia), por una razón identificada y específica de
 paisaje, no una falla de generalización sin explicar. **La CNN queda confirmada como clasificador
-operativo de MARTA** (decisión cerrada el 2026-09-13, `phase1-classifier` tarea 4.4), con esa
+operativo del sistema** (decisión cerrada el 2026-09-13, `phase1-classifier` tarea 4.4), con esa
 limitación documentada explícitamente, no escondida.
 
 ### 5.1 Comparación de precisión sobre el AOI
@@ -295,7 +295,7 @@ fragmentado en tiras; Random Forest, al mirar solo el píxel central, no tiene e
 
 ### 5.4 Decisión: clasificador operativo
 
-**La CNN queda confirmada como clasificador operativo de MARTA** (Grad-CAM, comparación temporal,
+**La CNN queda confirmada como clasificador operativo del sistema** (Grad-CAM, comparación temporal,
 estimación de carbono se construyen sobre ella) — gana o empata en 3 de los 4 contextos evaluados
 (AOI, Bahía Negra, Pozo Colorado) y pierde solo en Filadelfia, con una causa específica y
 entendida. Se considera aceptable porque el destino real de despliegue (el AOI de Corazón Verde
@@ -390,7 +390,7 @@ metodológico válido, no una falla del diseño.
 - El componente de predicción (3.3) no forma parte de la metodología retrospectiva originalmente
   acordada. Falta confirmar si es un componente obligatorio del núcleo del TFM o una extensión
   opcional.
-- ~~Cuál modelo usa MARTA como clasificador operativo (RF o CNN) está en revisión~~ — **resuelto,
+- ~~Cuál modelo usa el sistema como clasificador operativo (RF o CNN) está en revisión~~ — **resuelto,
   2026-09-13**: CNN confirmada como clasificador operativo, con la limitación de Filadelfia
   documentada explícitamente. Ver sección 5.4.
 - Si el resultado de la sección 5 se sostiene al escalar a un conjunto de entrenamiento mayor ya

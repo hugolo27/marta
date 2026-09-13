@@ -4,7 +4,7 @@ schema: spec-driven
 # This is shown to AI when creating artifacts.
 # Add your tech stack, conventions, style guides, domain knowledge, etc.
 context: |
-  MARTA — Final Master's Project (FP-UNA, MIAyCD). A satellite verification
+  Final Master's Project (FP-UNA, MIAyCD). A satellite verification
   pipeline for the REDD+ carbon credit market in the Paraguayan Chaco: land cover classification
   (forest/pasture/clearing/crop) with a CNN over Sentinel-2, ground truth from MapBiomas Chaco,
   Grad-CAM interpretability for auditability, feeding into a calibrated carbon/CO2 estimate.

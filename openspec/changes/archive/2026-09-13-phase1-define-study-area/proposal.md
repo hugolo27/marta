@@ -1,6 +1,6 @@
 ## Why
 
-Every downstream capability in MARTA — the Sentinel-2/MapBiomas dataset, the CNN classifier, the canopy height inference, the GEDI L4A calibration — needs a concrete geographic boundary to operate on. Nothing else can be built or tested without one. This is also the first concrete step the tutor recommended in the proposed methodology.
+Every downstream capability in the project — the Sentinel-2/MapBiomas dataset, the CNN classifier, the canopy height inference, the GEDI L4A calibration — needs a concrete geographic boundary to operate on. Nothing else can be built or tested without one. This is also the first concrete step the tutor recommended in the proposed methodology.
 
 ## What Changes
 

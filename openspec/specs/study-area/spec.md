@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the single geographic area of interest (AOI) that every other MARTA capability — dataset build, classification, canopy height inference, GEDI calibration — consumes as its spatial boundary.
+Defines the single geographic area of interest (AOI) that every other capability — dataset build, classification, canopy height inference, GEDI calibration — consumes as its spatial boundary.
 
 ## Requirements
 
