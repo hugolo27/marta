@@ -15,6 +15,7 @@ import json
 from pathlib import Path
 
 import ee
+import mlflow
 import numpy as np
 from shapely.geometry import box
 from shapely.ops import transform as shapely_transform
@@ -28,6 +29,7 @@ change_map = importlib.import_module("19_temporal_change_map")
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = REPO_ROOT / "data" / "study_area"
 PERIOD_BANDS = {"2019": "classification_2019", "2023": "classification_2023"}
+EXPERIMENT_NAME = "phase1-temporal-comparison"
 
 
 def remap_to_our_classes(image, band):
@@ -88,27 +90,32 @@ def report_agreement(ours, mapbiomas_diff):
 
 
 def main():
-    gee_session.init()
-    meta = json.loads((DATA_DIR / "aoi_classified_grid_meta.json").read_text())
-    ours = np.load(DATA_DIR / "change_map_2019_2023.npy")
+    mlflow.set_experiment(EXPERIMENT_NAME)
+    with mlflow.start_run(run_name="mapbiomas_cross_check"):
+        gee_session.init()
+        meta = json.loads((DATA_DIR / "aoi_classified_grid_meta.json").read_text())
+        ours = np.load(DATA_DIR / "change_map_2019_2023.npy")
 
-    aoi_wgs84 = classify_aoi.load_aoi_geom_wgs84()
-    aoi_m = shapely_transform(classify_aoi.to_utm, aoi_wgs84)
-    tiles, n_rows, n_cols = classify_aoi.build_tile_grid(aoi_m)
-    assert (n_rows, n_cols) == (meta["n_rows"], meta["n_cols"]), "tile grid drifted from 18's saved grid"
+        aoi_wgs84 = classify_aoi.load_aoi_geom_wgs84()
+        aoi_m = shapely_transform(classify_aoi.to_utm, aoi_wgs84)
+        tiles, n_rows, n_cols = classify_aoi.build_tile_grid(aoi_m)
+        assert (n_rows, n_cols) == (meta["n_rows"], meta["n_cols"]), "tile grid drifted from 18's saved grid"
 
-    mapbiomas = ee.Image(mapbiomas_legend.MAPBIOMAS_ASSET)
-    rasters = {}
-    for period, band in PERIOD_BANDS.items():
-        print(f"pulling MapBiomas {period}...")
-        rasters[period] = classify_period(mapbiomas, band, tiles, n_rows, n_cols)
+        mapbiomas = ee.Image(mapbiomas_legend.MAPBIOMAS_ASSET)
+        rasters = {}
+        for period, band in PERIOD_BANDS.items():
+            print(f"pulling MapBiomas {period}...")
+            rasters[period] = classify_period(mapbiomas, band, tiles, n_rows, n_cols)
 
-    mb_diff = change_map.build_change_map(rasters["2019"], rasters["2023"])
-    np.save(DATA_DIR / "mapbiomas_change_map_2019_2023.npy", mb_diff)
+        mb_diff = change_map.build_change_map(rasters["2019"], rasters["2023"])
+        np.save(DATA_DIR / "mapbiomas_change_map_2019_2023.npy", mb_diff)
 
-    table = report_agreement(ours, mb_diff)
-    (DATA_DIR / "mapbiomas_agreement.json").write_text(json.dumps(table, indent=2))
-    print(f"\nsaved: {DATA_DIR / 'mapbiomas_agreement.json'}")
+        table = report_agreement(ours, mb_diff)
+        mlflow.log_metrics({f"agreement_{name}": v["agreement"] for name, v in table.items()})
+        agreement_path = DATA_DIR / "mapbiomas_agreement.json"
+        agreement_path.write_text(json.dumps(table, indent=2))
+        print(f"\nsaved: {agreement_path}")
+        mlflow.log_artifact(str(agreement_path))
 
 
 if __name__ == "__main__":

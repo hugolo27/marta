@@ -1,10 +1,14 @@
 """CNN candidate, phase1-classifier tasks 3.1-3.3. Small custom architecture (not a pretrained
 backbone, see design.md), rotation/flip augmentation, early stopping. Hyperparameters and their
-justification are in docs/METODOLOGIA_PIPELINE.md, "Training hyperparameters"."""
+justification are in docs/METODOLOGIA_PIPELINE.md, "Training hyperparameters".
+Run directly (`main()`), logs the reference checkpoint's run to MLflow (experiment
+"phase1-classifier") -- train()/evaluate() called from elsewhere (11_compare_classifiers.py,
+holdout_eval.py) log their own runs there instead, to avoid double-logging the same training."""
 
 import random
 from pathlib import Path
 
+import mlflow
 import numpy as np
 import torch
 import torch.nn as nn
@@ -20,6 +24,7 @@ EARLY_STOP_PATIENCE = 10
 DROPOUT = 0.4
 OUT_DIR = Path(__file__).resolve().parents[1] / "data" / "study_area"
 CHECKPOINT_PATH = OUT_DIR / "cnn_checkpoint.pt"
+EXPERIMENT_NAME = "phase1-classifier"
 
 
 class SmallCNN(nn.Module):
@@ -147,13 +152,25 @@ def plot_training_curve(history, out_path=OUT_DIR / "cnn_training_curve.png"):
 
 
 def main():
-    print("Training CNN...")
-    model, device, history = train()
-    plot_training_curve(history)
-    results = evaluate(model, device)
-    classifier_report.print_evaluation(results, "CNN")
-    save_checkpoint(model, seed=42)
-    print(f"checkpoint saved: {CHECKPOINT_PATH}")
+    mlflow.set_experiment(EXPERIMENT_NAME)
+    with mlflow.start_run(run_name="reference_checkpoint_seed42"):
+        print("Training CNN...")
+        model, device, history = train()
+        plot_training_curve(history)
+        results = evaluate(model, device)
+        classifier_report.print_evaluation(results, "CNN")
+        save_checkpoint(model, seed=42)
+        print(f"checkpoint saved: {CHECKPOINT_PATH}")
+
+        mlflow.log_params({
+            "seed": 42, "batch_size": BATCH_SIZE, "lr": LEARNING_RATE, "dropout": DROPOUT,
+        })
+        mlflow.log_metric("macro_f1", results["report"]["macro avg"]["f1-score"])
+        mlflow.log_metric("accuracy", results["report"]["accuracy"])
+        for cls, iou in zip(dl.CLASS_NAMES, results["iou_per_class"]):
+            mlflow.log_metric(f"iou_{cls}", iou)
+        mlflow.log_artifact(str(CHECKPOINT_PATH))
+        mlflow.log_artifact(str(OUT_DIR / "cnn_training_curve.png"))
 
 
 if __name__ == "__main__":

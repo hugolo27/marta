@@ -11,6 +11,7 @@ from pathlib import Path
 
 import ee
 import matplotlib.pyplot as plt
+import mlflow
 import numpy as np
 import pyproj
 from matplotlib.colors import ListedColormap
@@ -18,6 +19,8 @@ from matplotlib.colors import ListedColormap
 import gee_session
 import s2_utils
 from dataset_loader import CLASS_NAMES
+
+EXPERIMENT_NAME = "phase1-temporal-comparison"
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = REPO_ROOT / "data" / "study_area"
@@ -140,21 +143,27 @@ def visual_check(change, meta):
 
 
 def main():
-    gee_session.init()
-    meta = json.loads((DATA_DIR / "aoi_classified_grid_meta.json").read_text())
-    before = np.load(DATA_DIR / "aoi_classified_2019.npy")
-    after = np.load(DATA_DIR / "aoi_classified_2023.npy")
+    mlflow.set_experiment(EXPERIMENT_NAME)
+    with mlflow.start_run(run_name="change_map_2019_2023"):
+        gee_session.init()
+        meta = json.loads((DATA_DIR / "aoi_classified_grid_meta.json").read_text())
+        before = np.load(DATA_DIR / "aoi_classified_2019.npy")
+        after = np.load(DATA_DIR / "aoi_classified_2023.npy")
 
-    change = build_change_map(before, after)
-    stats = report_stats(change, meta["pixel_m"])
+        change = build_change_map(before, after)
+        stats = report_stats(change, meta["pixel_m"])
+        mlflow.log_metrics({f"ha_{name}": v["ha"] for name, v in stats.items()})
 
-    np.save(DATA_DIR / "change_map_2019_2023.npy", change)
-    (DATA_DIR / "change_stats_2019_2023.json").write_text(json.dumps(stats, indent=2))
-    print(f"saved: {DATA_DIR / 'change_map_2019_2023.npy'}")
-    print(f"saved: {DATA_DIR / 'change_stats_2019_2023.json'}")
+        np.save(DATA_DIR / "change_map_2019_2023.npy", change)
+        stats_path = DATA_DIR / "change_stats_2019_2023.json"
+        stats_path.write_text(json.dumps(stats, indent=2))
+        print(f"saved: {DATA_DIR / 'change_map_2019_2023.npy'}")
+        print(f"saved: {stats_path}")
+        mlflow.log_artifact(str(stats_path))
 
-    plot_change_map(change, DATA_DIR / "change_map_2019_2023.png")
-    visual_check(change, meta)
+        plot_change_map(change, DATA_DIR / "change_map_2019_2023.png")
+        mlflow.log_artifact(str(DATA_DIR / "change_map_2019_2023.png"))
+        visual_check(change, meta)
 
 
 if __name__ == "__main__":

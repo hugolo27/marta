@@ -22,6 +22,7 @@ import json
 from pathlib import Path
 
 import ee
+import mlflow
 import numpy as np
 import pyproj
 from numpy.lib.stride_tricks import sliding_window_view
@@ -46,6 +47,7 @@ CNN_BATCH = 512
 ROW_CHUNK = 40
 UNCLASSIFIED = -1
 CLASS_NAMES = ["bosque", "pasto", "cultivo"]
+EXPERIMENT_NAME = "phase1-temporal-comparison"
 
 to_utm = pyproj.Transformer.from_crs("EPSG:4326", UTM_CRS, always_xy=True).transform
 to_wgs84 = pyproj.Transformer.from_crs(UTM_CRS, "EPSG:4326", always_xy=True).transform
@@ -154,33 +156,46 @@ def classify_period(period, start, end, model, device, aoi_m, tiles, n_rows, n_c
 
 
 def main():
-    gee_session.init()
-    aoi_wgs84 = load_aoi_geom_wgs84()
-    aoi_m = shapely_transform(to_utm, aoi_wgs84)
-    tiles, n_rows, n_cols = build_tile_grid(aoi_m)
-    print(f"AOI tiled into {len(tiles)} blocks ({n_rows} rows x {n_cols} cols of up to "
-          f"{TILE_CORE_PX}x{TILE_CORE_PX} px each)")
+    mlflow.set_experiment(EXPERIMENT_NAME)
+    with mlflow.start_run(run_name="classify_aoi_2019_2023"):
+        gee_session.init()
+        aoi_wgs84 = load_aoi_geom_wgs84()
+        aoi_m = shapely_transform(to_utm, aoi_wgs84)
+        tiles, n_rows, n_cols = build_tile_grid(aoi_m)
+        print(f"AOI tiled into {len(tiles)} blocks ({n_rows} rows x {n_cols} cols of up to "
+              f"{TILE_CORE_PX}x{TILE_CORE_PX} px each)")
 
-    model, device = train_cnn.load_checkpoint()
-    print(f"Loaded checkpoint: {train_cnn.CHECKPOINT_PATH}")
+        model, device = train_cnn.load_checkpoint()
+        print(f"Loaded checkpoint: {train_cnn.CHECKPOINT_PATH}")
+        mlflow.log_params({
+            "n_tiles": len(tiles), "n_rows": n_rows, "n_cols": n_cols,
+            "tile_core_px": TILE_CORE_PX, "pixel_m": PIXEL_M, "utm_crs": UTM_CRS,
+        })
 
-    rasters = {}
-    for period, (start, end) in PERIODS.items():
-        print(f"\nClassifying {period}...")
-        rasters[period] = classify_period(period, start, end, model, device, aoi_m, tiles, n_rows, n_cols)
+        rasters = {}
+        for period, (start, end) in PERIODS.items():
+            print(f"\nClassifying {period}...")
+            rasters[period] = classify_period(period, start, end, model, device, aoi_m, tiles, n_rows, n_cols)
+            unclassified_frac = float((rasters[period] == UNCLASSIFIED).mean())
+            mlflow.log_metric(f"unclassified_fraction_{period}", unclassified_frac)
 
-    for period, raster in rasters.items():
-        out_path = OUT_DIR / f"aoi_classified_{period}.npy"
-        np.save(out_path, raster)
-        print(f"saved: {out_path}")
+        # The rasters themselves aren't logged as MLflow artifacts (~27MB each, already excluded
+        # from git for the same reason, .gitignore) -- fully reproducible by rerunning this script
+        # against the same checkpoint, so the metrics above are what's worth tracking per run.
+        for period, raster in rasters.items():
+            out_path = OUT_DIR / f"aoi_classified_{period}.npy"
+            np.save(out_path, raster)
+            print(f"saved: {out_path}")
 
-    grid_meta = {
-        "n_rows": n_rows, "n_cols": n_cols, "tile_core_px": TILE_CORE_PX, "pixel_m": PIXEL_M,
-        "utm_crs": UTM_CRS, "aoi_utm_bounds": list(aoi_m.bounds),
-        "class_names": CLASS_NAMES, "unclassified_value": UNCLASSIFIED,
-    }
-    (OUT_DIR / "aoi_classified_grid_meta.json").write_text(json.dumps(grid_meta, indent=2))
-    print(f"saved: {OUT_DIR / 'aoi_classified_grid_meta.json'}")
+        grid_meta = {
+            "n_rows": n_rows, "n_cols": n_cols, "tile_core_px": TILE_CORE_PX, "pixel_m": PIXEL_M,
+            "utm_crs": UTM_CRS, "aoi_utm_bounds": list(aoi_m.bounds),
+            "class_names": CLASS_NAMES, "unclassified_value": UNCLASSIFIED,
+        }
+        meta_path = OUT_DIR / "aoi_classified_grid_meta.json"
+        meta_path.write_text(json.dumps(grid_meta, indent=2))
+        print(f"saved: {meta_path}")
+        mlflow.log_artifact(str(meta_path))
 
 
 if __name__ == "__main__":
