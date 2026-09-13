@@ -84,13 +84,23 @@ dato, cómo se procesa y para qué se usa el resultado.
 
 | Fuente | Qué es | Cobertura temporal/espacial | Por qué esta fuente y no una alternativa |
 |---|---|---|---|
-| **Sentinel-2 L2A** (Copernicus/ESA) | Imágenes multiespectrales, 13 bandas, 10 m de resolución nativa, revisita nominal de 5 días | Global; en este proyecto, usable de forma densa desde 2019 sobre el área de trabajo (chequeo empírico: 14 escenas en 2018 contra 73 en 2019 sobre el mismo polígono) | Resolución más fina que Landsat (30 m) y acceso a bandas red-edge/SWIR que un RGB simple no tiene. Se usa Nivel-2A porque ya viene corregido atmosféricamente |
+| **Sentinel-2 L2A** (Copernicus/ESA) | Imágenes multiespectrales, 13 bandas, 10 m de resolución nativa, revisita nominal de 5 días | Global; en este proyecto, usable de forma densa desde 2019 sobre el área de trabajo (chequeo empírico: 14 escenas en 2018 contra 73 en 2019 sobre el mismo polígono) | Resolución más fina que Landsat (30 m) y acceso a bandas red-edge/SWIR que un RGB simple no tiene. Se usa L2A (reflectancia de superficie) y no L1C (tope de atmósfera, sin corregir) por tres razones concretas: (1) la comparación temporal 2019 vs. 2023 necesita que los valores de reflectancia sean comparables entre fechas — con L1C, condiciones atmosféricas distintas en cada fecha meterían diferencias que no son cambio real de cobertura; (2) NDVI y otros índices espectrales solo son físicamente válidos sobre reflectancia de superficie, no sobre valores distorsionados por dispersión atmosférica; (3) MapBiomas (la etiqueta) ya sale de reflectancia de superficie de Landsat corregida — usar L2A mantiene la misma magnitud física de ambos lados del par imagen-etiqueta |
 | **MapBiomas Chaco, Colección 5** | Clasificación de cobertura de suelo, un raster por año (1985-2023, 39 capas), 30 m, derivado de Landsat | Gran Chaco americano; en este proyecto, recortado a Paraguay | Es el único producto abierto con clasificación anual a escala de bioma y con suficiente profundidad histórica para modelar tendencia. Además evita tener que digitalizar el ground truth a mano, algo inviable en el volumen que pide entrenar un clasificador |
 | **ESA WorldCover v200** | Cobertura de suelo global, 10 m, año de referencia 2021 | Global | Su resolución nativa coincide con la de Sentinel-2, a diferencia de MapBiomas (30 m). Se usa solo como verificación independiente sobre un área que nunca entra en entrenamiento; mezclarlo con las etiquetas de entrenamiento sería circular |
 | **ETH Global Canopy Height** (Lang, Jetz, Schindler y Wegner, 2023, *Nature Ecology & Evolution*) | Modelo pre-entrenado que infiere altura de dosel a partir de Sentinel-2, con capa de incertidumbre propia, año base 2020 | Global | Se prefirió sobre la alternativa Potapov/GLAD (UMD) porque entrega altura e incertidumbre en bruto y deja la calibración a biomasa como un paso propio, auditable, en vez de heredar una calibración ya resuelta por terceros |
 | **GEDI L4A** (`GEDI_L4A_AGB_Density_V3`, NASA/ORNL DAAC) | Densidad de biomasa aérea medida por lidar espacial, punto por punto | Abril 2019 a marzo 2023 sobre el AOI del caso de estudio (39 gránulos, 3.823 footprints de calidad tras filtrar por `l4a_quality_flag_rel3`, unos 18,6 footprints de calidad cada 100 ha) | Es la referencia estándar de biomasa aérea satelital, revisada por pares, y es el mismo dato contra el cual el propio modelo ETH fue validado en su publicación original |
 | **FAO GAUL 2015, nivel 1** | Límites administrativos oficiales por país y departamento | Paraguay: Alto Paraguay, Boquerón y Presidente Hayes (Región Occidental) | Ya está disponible como asset nativo en Google Earth Engine, así que define la huella de muestreo ampliada (sección 2) sin necesitar un archivo geoespacial aparte |
 | **Variables explicativas para el modelo predictivo** (distancia a red vial, distancia al borde de cambio observado, pendiente del terreno, tenencia de tierra o estatus de área protegida) | Capas de contexto geográfico, no series de cobertura | Pendiente de definición final | La distancia al borde de cambio se puede derivar directamente de la propia serie MapBiomas. Red vial y pendiente tienen fuentes estándar (OpenStreetMap, SRTM) que todavía no se incorporaron. Tenencia de tierra y área protegida no tienen fuente identificada por ahora: queda como pendiente explícito, no resuelto por omisión |
+
+**Nota sobre los "niveles" de procesamiento (L1C, L2A, L4A).** El concepto general de niveles
+(0 a 4: dato crudo → calibrado → variable geofísica derivada → grilla uniforme → producto de
+modelo) viene de la convención de NASA/EOSDIS y lo siguen distintas misiones — por eso GEDI L4A
+("Level 4A") y Sentinel-2 L2A comparten la lógica de fondo, aunque midan cosas completamente
+distintas. Lo que **no** es universal es el detalle fino de cada letra: en Sentinel-2, L1C es
+reflectancia "tope de atmósfera" (sin corregir) y L2A es reflectancia de superficie ya corregida
+atmosféricamente (algoritmo Sen2Cor, propio de Copernicus); Landsat tiene su propio Level-1/Level-2
+con su propio algoritmo, no intercambiable byte a byte con el de Sentinel-2 pese a compartir el
+mismo número de nivel.
 
 ## 2. Áreas de estudio: por qué son tres y no una
 
@@ -145,6 +155,42 @@ clase no incluye "desmonte" como cuarta categoría: MapBiomas clasifica el estad
 por año, no eventos de tala, así que el cambio se obtiene comparando dos clasificaciones de fechas
 distintas, en vez de predecirse directamente.
 
+Las divisiones de entrenamiento, validación y prueba se asignan por bloque espacial (~2 km,
+agrupados por clase) y no por punto individual: dos parches a 330 m o menos de distancia pueden
+corresponder al mismo terreno real, así que una asignación puramente aleatoria por punto arriesga
+contaminación entre conjuntos. Un chequeo posterior de distancia mínima confirma que ningún par de
+parches entre conjuntos distintos queda por debajo de esa distancia. El muestreo de entrenamiento
+se apoya en la proyección nativa de MapBiomas, no en una reproyección hacia la grilla de
+Sentinel-2: la huella de muestreo cruza dos husos UTM (20S y 21S), y forzar toda el área a un único
+huso arbitrario distorsionaría los puntos alejados de esa zona. La correspondencia exacta 3×3 se
+demuestra de forma acotada sobre el AOI del caso de estudio, que sí queda dentro de un único huso.
+
+Los composites de cada período se arman enmascarando nubes por-píxel vía la banda SCL (Scene
+Classification Layer), no por el metadato más grueso de nubosidad por escena. Para 2019: 25 escenas,
+36,4 % de nubosidad promedio por escena, 0 % de hueco residual tras el compositing. Para 2023: 24
+escenas, 44,2 %, también 0 % de hueco residual. Ambos muy por debajo del umbral de 5 % fijado como
+criterio → no hace falta sumar Sentinel-1 SAR para cubrir huecos.
+
+**Hiperparámetros de entrenamiento, con su criterio de elección**
+
+| Modelo | Parámetro | Valor | Criterio |
+|---|---|---|---|
+| Random Forest | Número de árboles | 400 | Rango estándar (300-500): la reducción de varianza tiene retornos decrecientes pasados unos cientos de árboles |
+| Random Forest | Profundidad máxima | Sin límite | La reducción de varianza de un bosque aleatorio viene de promediar muchos árboles individualmente sobreajustados, no de limitar la profundidad de cada uno |
+| Random Forest | Variables de entrada | 12 bandas + NDVI del píxel central del parche | No se usa la ventana espacial completa: el modelo no puede aprovechar el contexto espacial que sí usa la CNN, así que dársela no aportaría una comparación más justa, solo mayor dimensionalidad |
+| CNN | Arquitectura | 3 bloques convolucionales (32/64/128 filtros) + pooling global + dropout | Deliberadamente pequeña, no un modelo pre-entrenado grande: mantiene legible una eventual capa de interpretabilidad y no oscurece la comparación contra el baseline |
+| CNN | Tamaño de lote | 32 | Valor estándar para un conjunto de entrenamiento de este orden (~840 ejemplos) |
+| CNN | Tasa de aprendizaje | 0,001 | Valor por defecto recomendado en la publicación original del optimizador Adam (Kingma y Ba, 2014) |
+| CNN | Épocas máximas / paciencia | 100 / 10 | El entrenamiento se corta si la pérdida de validación deja de mejorar durante 10 épocas seguidas, en vez de fijar a priori un número de épocas arbitrario |
+| CNN | Dropout | 0,4 | Rango estándar (0,3-0,5) para un conjunto de entrenamiento acotado (~280 ejemplos por clase), donde el riesgo de sobreajuste es real |
+| CNN | Aumentado de datos | Rotaciones de 90°/180°/270° y espejado | Válido para imágenes satelitales vistas cenitalmente. No se aplica aumentado de color o brillo: los valores de reflectancia de Sentinel-2 tienen significado físico, y distorsionarlos podría dañar la señal en lugar de mejorar la generalización |
+
+El criterio de comparación entre modelos se fija antes de observar resultados: ambos se entrenan y
+evalúan en 5 corridas con distinta semilla aleatoria (que afecta la inicialización y el muestreo
+interno de cada modelo, no la partición de datos, que permanece fija entre corridas), se mide el
+F1 promediado por clase, y la CNN solo se considera superior si su F1 medio excede al de Random
+Forest en más de una desviación estándar combinada entre ambas distribuciones de corridas.
+
 ### 3.2 Estimación de carbono (variable continua, componente retrospectivo)
 
 La calibración altura-biomasa se ajusta una sola vez, usando los footprints GEDI L4A disponibles
@@ -188,7 +234,86 @@ caso de estudio ni sobre datos usados en entrenamiento. Combina dos verificacion
 la exactitud del clasificador en una región geográfica que nunca vio, y el contraste contra ESA
 WorldCover.
 
-## 5. Justificación de cada modelo
+## 5. Resultados: clasificación de cobertura, CNN contra Random Forest
+
+**Resumen**: la CNN gana la comparación de precisión sobre el conjunto de prueba del área de
+estudio (AOI); evaluada contra 3 sub-áreas geográficamente independientes, gana o empata en 2 de
+las 3 y pierde claramente en la tercera (Filadelfia), por una razón identificada y específica de
+paisaje, no una falla de generalización sin explicar. **La CNN queda confirmada como clasificador
+operativo de MARTA** (decisión cerrada el 2026-09-13, `phase1-classifier` tarea 4.4), con esa
+limitación documentada explícitamente, no escondida.
+
+### 5.1 Comparación de precisión sobre el AOI
+
+Sobre el conjunto de prueba del AOI (~360 ejemplos, nunca usados en entrenamiento ni ajuste),
+promediando 5 corridas con distinta semilla, sobre el dataset final (2.393 patches, 400 por
+clase/período, sin fuga espacial verificada):
+
+| Modelo | F1 macro promedio | Desviación estándar |
+|---|---|---|
+| Random Forest | 0,811 | 0,004 |
+| CNN | 0,843 | 0,012 |
+
+La diferencia (+0,032 a favor de la CNN) supera el umbral de una desviación estándar combinada
+(0,009) fijado antes de correr el experimento. Por el criterio pre-registrado, **la CNN gana esta
+comparación**, y lo hizo de forma consistente en 3 volúmenes/huellas de datos distintos probados
+durante el desarrollo (ver la nota de trazabilidad al final de esta sección). Ambos modelos
+muestran el mismo patrón de error: la confusión entre pasto y cultivo es sistemáticamente mayor
+que la confusión de cualquiera de las dos con bosque.
+
+### 5.2 Evaluación de generalización: 3 sub-áreas held-out independientes
+
+El AOI por sí solo no prueba generalización geográfica — sus ejemplos de prueba salen de la misma
+huella de entrenamiento. Se evaluaron ambos modelos, ya entrenados, contra 3 sub-áreas excluidas
+por completo del entrenamiento, con topologías de paisaje distintas a propósito, cada una con 5
+corridas de re-entrenamiento para tener una estimación real de varianza (no solo un número suelto):
+
+| Región | Perfil de paisaje | RF (media ± desvío) | CNN (media ± desvío) | Resultado |
+|---|---|---|---|---|
+| Filadelfia (Boquerón) | Colonia agrícola menonita, bosque fragmentado | 0,829 ± 0,001 | 0,696 ± 0,021 | **RF gana, decisivo** (gana en las 5 semillas) |
+| Bahía Negra (Alto Paraguay) | Bosque continuo, remoto | 0,611 ± 0,002 | 0,611 ± 0,016 | **Empate real** |
+| Pozo Colorado (Presidente Hayes) | Ganadería, ruta Trans-Chaco | 0,661 ± 0,006 | 0,727 ± 0,021 | **CNN gana**, confirmado |
+
+**Nota metodológica, vale la pena dejarla explícita**: la primera corrida de estas 3 regiones (una
+sola semilla cada una) sugería "RF gana en 2 de 3" — con las 5 semillas, ese resultado en Bahía
+Negra resultó ser ruido de una corrida particular que agarró a la CNN en su peor semilla; el
+resultado real es un empate. Sin esa segunda pasada con varianza real, la conclusión habría
+quedado mal reportada.
+
+### 5.3 Por qué falla la CNN específicamente en Filadelfia
+
+Se investigó la causa, no solo se documentó el número. Descartado: no es efecto de período (2019
+y 2023 fallan a tasas casi idénticas), y no es falta de volumen de datos (duplicar el
+entrenamiento a 400 ejemplos/clase/período no movió el resultado en Filadelfia, mientras que el
+mismo cambio sí mejoró notablemente el bosque del propio AOI). Confirmado, con evidencia estadística
+y visual: los puntos de bosque real que la CNN clasifica mal tienen una firma espectral SWIR de
+canopy fino/degradado, y al inspeccionar los patches directamente, son sistemáticamente **franjas
+angostas de bosque entre campos** (cortinas rompevientos, un rasgo estándar de la agricultura
+menonita) que no llenan la ventana de 330m — no bloques de bosque contiguo. La CNN aprendió
+"bosque" en parte como un patrón espacial de canopy grande y continuo, que no transfiere a bosque
+fragmentado en tiras; Random Forest, al mirar solo el píxel central, no tiene ese modo de falla.
+
+### 5.4 Decisión: clasificador operativo
+
+**La CNN queda confirmada como clasificador operativo de MARTA** (Grad-CAM, comparación temporal,
+estimación de carbono se construyen sobre ella) — gana o empata en 3 de los 4 contextos evaluados
+(AOI, Bahía Negra, Pozo Colorado) y pierde solo en Filadelfia, con una causa específica y
+entendida. Se considera aceptable porque el destino real de despliegue (el AOI de Corazón Verde
+del Chaco, Fase 4) está dentro de la huella de entrenamiento y no es un paisaje de colonia
+fragmentada como Filadelfia (sección 2). **Limitación documentada, no oculta**: no confiar en la
+CNN sin cruzar contra Random Forest para clasificar bosque en paisajes con fragmentación
+estructuralmente similar a Filadelfia (franjas angostas, cortinas rompevientos). El resultado de
+Random Forest no se descarta — sigue siendo la opción más robusta específicamente para ese tipo de
+paisaje.
+
+**Nota de trazabilidad**: este resultado pasó por 8 rondas de revisión de código y verificación
+independiente (documentadas en `openspec/changes/phase1-classifier/tasks.md`), incluyendo dos
+correcciones de rumbo reales — una fuga de datos entre períodos que originalmente mostraba un
+empate técnico, y una corrección posterior de un resumen propio que sobreestimaba cuántas regiones
+"generalizaba bien" la CNN. Cada corrección quedó documentada explícitamente en vez de absorbida
+en silencio — es, en sí mismo, parte de cómo se construyó la confianza en el resultado final.
+
+## 6. Justificación de cada modelo
 
 **CNN.** Candidata de clasificación porque puede aprovechar contexto espacial (textura, patrones de
 dosel) dentro de la ventana de 33×33 píxeles. Un clasificador que evalúa cada píxel de forma
@@ -205,7 +330,11 @@ imagen sostuvo esa clasificación, y eso le permite a un revisor humano chequear
 basó en evidencia razonable o si se equivocó de forma identificable, como confundir una nube con
 una zona desmontada. No detecta manipulación intencional de las imágenes de entrada, no verifica la
 calidad del propio ground truth de entrenamiento, y no reemplaza la validación de campo. Lo que
-hace es bajar el costo de auditar una predicción, no eliminar la necesidad de hacerlo.
+hace es bajar el costo de auditar una predicción, no eliminar la necesidad de hacerlo. Dado que la
+comparación de la sección 5 no encontró una diferencia significativa entre la CNN y el baseline,
+esta evaluación de Grad-CAM se sostiene como pregunta propia, independiente de cuál de los dos
+modelos termine usándose en el resto del pipeline: la coherencia de sus mapas de calor sobre esta
+vegetación se pone a prueba de todas formas, no solo si la CNN resultara claramente superior.
 
 **Altura de dosel (ETH) más calibración GEDI L4A.** La justificación de la fuente ya está en la
 sección 1. Como técnica, la calibración es una regresión potencial log-log simple (`AGBD = a·H^b`),
@@ -222,7 +351,7 @@ extra encima.
 cambio directamente de la serie histórica multianual, sin que alguien tenga que especificarle a
 mano las reglas de vecindario ni los pesos de las variables explicativas que CA-Markov sí necesita.
 
-## 6. Por qué clasificación, regresión y predicción
+## 7. Por qué clasificación, regresión y predicción
 
 Estas tres componentes no son redundantes entre sí. Cada una responde una pregunta que las otras
 dos no pueden responder, y juntas son el mínimo necesario para que el pipeline funcione como
@@ -253,7 +382,7 @@ modelo espaciotemporal), sin asumir de antemano que la complejidad adicional se 
 desempeño. Que el modelo de referencia iguale o supere al candidato es, en este marco, un hallazgo
 metodológico válido, no una falla del diseño.
 
-## 7. Ítems abiertos
+## 8. Ítems abiertos
 
 - Variables explicativas del modelo predictivo: tenencia de tierra y área protegida no tienen
   fuente identificada. Red vial y pendiente tienen fuente estándar disponible pero todavía no
@@ -261,6 +390,9 @@ metodológico válido, no una falla del diseño.
 - El componente de predicción (3.3) no forma parte de la metodología retrospectiva originalmente
   acordada. Falta confirmar si es un componente obligatorio del núcleo del TFM o una extensión
   opcional.
-- La evaluación de generalización (sección 4) está diseñada pero no ejecutada: requiere que el
-  clasificador de 3.1 esté entrenado a volumen completo, no solo con la muestra de prueba usada
-  hasta ahora para validar el mecanismo de extracción de datos.
+- ~~Cuál modelo usa MARTA como clasificador operativo (RF o CNN) está en revisión~~ — **resuelto,
+  2026-09-13**: CNN confirmada como clasificador operativo, con la limitación de Filadelfia
+  documentada explícitamente. Ver sección 5.4.
+- Si el resultado de la sección 5 se sostiene al escalar a un conjunto de entrenamiento mayor ya
+  no es una pregunta abierta: se probó directamente (`N_PER_CLASS` 200→400) y la conclusión se
+  mantuvo — ver sección 5, nota de trazabilidad.

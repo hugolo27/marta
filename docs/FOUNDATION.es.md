@@ -4,7 +4,7 @@
 
 ## El problema
 
-Generar un Reporte de Monitoreo para un proyecto REDD+ en el Chaco paraguayo depende hoy casi enteramente del criterio manual de un técnico GIS: descarga imágenes, clasifica cobertura de suelo a ojo o con herramientas semi-automáticas, calcula biomasa/carbono con métodos heterogéneos, y entrega un informe que el auditor (VVB) revisa como una caja negra, sin evidencia trazable de por qué se clasificó algo como desmonte o cómo se llegó a la cifra de toneladas de CO2.
+Generar un Reporte de Monitoreo para un proyecto REDD+ en el Chaco paraguayo hoy combina criterio manual de un técnico GIS, herramientas de clasificación semi-automática, y plataformas de monitoreo satelital que ya corren a escala (Global Forest Watch/Global Nature Watch, el propio MapBiomas). Ninguna de estas da evidencia por predicción individual: la biomasa/carbono se calcula con métodos heterogéneos, y el auditor (VVB) revisa el informe resultante como una caja negra, sin evidencia trazable de por qué un área específica se clasificó como desmonte — sea que esa clasificación haya salido de una persona o de un algoritmo — ni de cómo se llegó a la cifra de toneladas de CO2.
 
 Esto genera dos problemas concretos:
 

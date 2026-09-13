@@ -27,18 +27,29 @@ The system SHALL evaluate both models on the dataset's test split using accuracy
 
 #### Scenario: CNN does not outperform the baseline
 - **WHEN** the CNN's test-set metrics do not meaningfully exceed the Random Forest baseline's
-- **THEN** the system reports this as a valid finding and carries the Random Forest baseline forward as the classifier, without treating the result as a failure of the evaluation
+- **THEN** the system reports this as a valid finding, without treating the result as a failure of the evaluation — which model becomes the operational classifier is a separate decision (see Requirement: Operational classifier selection)
+
+### Requirement: Operational classifier selection
+The system SHALL select the operational classifier used by downstream capabilities (Grad-CAM, temporal comparison, carbon estimation) based on the accuracy comparison together with whether per-prediction interpretability is required, not on accuracy alone — because Grad-CAM can only ever attach to a differentiable model with spatial activation maps, never to Random Forest, regardless of future tooling investment.
+
+#### Scenario: Tied or comparable accuracy
+- **WHEN** the CNN's test-set metrics are statistically tied with the Random Forest baseline (within the pre-registered margin) or otherwise comparable
+- **THEN** the system selects the CNN as the operational classifier, since it uniquely supports per-prediction Grad-CAM evidence at no meaningful accuracy cost, while the Random Forest result is retained as the documented baseline comparison finding, not discarded
+
+#### Scenario: Random Forest meaningfully outperforms
+- **WHEN** the Random Forest baseline's test-set metrics exceed the CNN's by more than the pre-registered margin
+- **THEN** the system selects the Random Forest baseline as the operational classifier, since a real accuracy cost outweighs the interpretability benefit, and any Grad-CAM work is scoped as a separate diagnostic tool rather than feeding the production classifier
 
 ### Requirement: Cross-region generalization check
-The system SHALL evaluate the selected classifier on the Filadelfia held-out sub-region, which was never used in training, validation, or hyperparameter tuning.
+The system SHALL evaluate the operational classifier on the Filadelfia held-out sub-region, which was never used in training, validation, or hyperparameter tuning.
 
 #### Scenario: Generalization metrics reported
-- **WHEN** the selected classifier is run over the held-out sub-region
+- **WHEN** the operational classifier is run over the held-out sub-region
 - **THEN** the system reports accuracy/agreement metrics for that region alongside the case-study AOI's own test-set metrics
 
 ### Requirement: ESA WorldCover cross-check
-The system SHALL cross-check the selected classifier's predictions over the held-out sub-region against ESA WorldCover labels, independent of the MapBiomas-derived training labels.
+The system SHALL cross-check the operational classifier's predictions over the held-out sub-region against ESA WorldCover labels, independent of the MapBiomas-derived training labels.
 
 #### Scenario: Cross-check produced
-- **WHEN** the selected classifier's predictions over the held-out sub-region are available
+- **WHEN** the operational classifier's predictions over the held-out sub-region are available
 - **THEN** the system reports agreement between those predictions and ESA WorldCover, noting explicitly that the "pasto" comparison is a weaker proxy than "bosque" or "cultivo" (per the documented WorldCover legend limitation)

@@ -4,7 +4,7 @@
 
 ## The problem
 
-Generating a Monitoring Report for a REDD+ project in the Paraguayan Chaco today depends almost entirely on the manual judgment of a GIS technician: downloading imagery, classifying land cover by eye or with semi-automatic tools, calculating biomass/carbon with inconsistent methods, and delivering a report that the auditor (VVB) reviews as a black box, with no traceable evidence of why something was classified as deforestation or how the CO2 tonnage figure was reached.
+Generating a Monitoring Report for a REDD+ project in the Paraguayan Chaco today relies on some mix of manual GIS judgment, semi-automatic classification tools, and aggregate satellite monitoring platforms that already run at scale (Global Forest Watch/Global Nature Watch, MapBiomas itself). None of these give per-prediction evidence: biomass/carbon is calculated with inconsistent methods, and the auditor (VVB) reviews the resulting report as a black box, with no traceable evidence of why a specific area was classified as deforestation — whether that classification came from a person or an algorithm — or how the CO2 tonnage figure was reached.
 
 This creates two concrete problems:
 

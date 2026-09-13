@@ -2,7 +2,7 @@
 phase1-define-study-area task 3). Counts footprints actually inside the AOI polygon, not just
 granules touching its bounding box, and reports the quality-flag pass rate.
 
-Usage: .venv/bin/python scripts/gedi_feasibility_check.py (needs EARTHDATA_USERNAME/PASSWORD
+Usage: .venv/bin/python scripts/02_gedi_feasibility_check.py (needs EARTHDATA_USERNAME/PASSWORD
 in .env)."""
 
 import json

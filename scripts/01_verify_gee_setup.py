@@ -1,5 +1,5 @@
 """GEE auth + AOI area sanity check (phase1-dataset-build 1.1-1.2). Usage: .venv/bin/python
-scripts/verify_gee_setup.py"""
+scripts/01_verify_gee_setup.py"""
 
 import json
 from pathlib import Path

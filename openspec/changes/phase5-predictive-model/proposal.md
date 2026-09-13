@@ -24,5 +24,5 @@ Every capability in MARTA so far is retrospective: it classifies and quantifies 
 
 - New driver/covariate data sourcing (roads, cleared-edge distance, terrain, tenure) not previously part of the pipeline — none identified yet, this change's design/tasks need to source them.
 - Depends conceptually on: the AOI (`study-area`, already resolved), a multi-year MapBiomas land cover series for the AOI, and the historical carbon-density-per-transition-type figures produced by the Fase 1 classification pipeline and the Fase 2 carbon pipeline — neither of which exists as an OpenSpec change yet. This proposal does not block on those changes existing, but implementation (`/opsx:apply`) does depend on their outputs being available.
-- Updates `docs/FOUNDATION.md` and `docs/PIPELINE.md` (already done ahead of this proposal, during design discussion) to reflect the predictive extension as a candidate pending tutor confirmation on required-vs-optional status.
+- Updates `docs/FOUNDATION.md` and `docs/METODOLOGIA_PIPELINE.md` (already done ahead of this proposal, during design discussion) to reflect the predictive extension as a candidate pending tutor confirmation on required-vs-optional status.
 - No code, training, or data pipeline work happens in this change — planning artifacts only.

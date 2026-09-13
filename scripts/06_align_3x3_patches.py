@@ -3,51 +3,29 @@ MapBiomas onto S2's own 30m grid makes each label cell exactly cover a 3x3 block
 S2 pixels, no separate alignment math needed. QA: spot-checks real bosque/pasto boundary pixels
 (via neighborhood-diversity edge mask), not arbitrary points.
 
-Usage: .venv/bin/python scripts/align_3x3_patches.py"""
+This reproject is only valid on a single-UTM-zone region like the AOI used here — it's a
+demonstration that the alignment mechanism works, not the method 08_assemble_dataset.py uses for
+bulk sampling over the multi-zone footprint (see that script's docstring, code review 2026-09-03).
 
-import json
-from pathlib import Path
+Usage: .venv/bin/python scripts/06_align_3x3_patches.py"""
 
 import ee
 
 import gee_session
 import mapbiomas_legend
+import s2_utils
 
-AOI_PATH = Path(__file__).resolve().parents[1] / "data" / "study_area" / "aoi.geojson"
-MAPBIOMAS_ASSET = "projects/mapbiomas-public/assets/chaco/lulc/collection5/mapbiomas_chaco_collection5_integration_v2"
-CLOUD_FREE_SCL = [4, 5, 6, 7, 11]
 N_SPOT_CHECKS = 5
-
-
-def load_aoi():
-    geojson = json.loads(AOI_PATH.read_text())
-    return ee.Geometry(geojson["features"][0]["geometry"])
-
-
-def mask_clouds(image):
-    scl = image.select("SCL")
-    clear = scl.remap(CLOUD_FREE_SCL, [1] * len(CLOUD_FREE_SCL), 0)
-    return image.updateMask(clear)
-
-
-def build_s2_composite(aoi):
-    collection = (
-        ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
-        .filterBounds(aoi)
-        .filterDate("2019-06-01", "2019-09-30")
-        .map(mask_clouds)
-    )
-    return collection.select(["B4", "B3", "B2"]).median().clip(aoi)
 
 
 def main():
     gee_session.init()
-    aoi = load_aoi()
+    aoi = s2_utils.load_aoi()
 
-    s2 = build_s2_composite(aoi)
+    s2 = s2_utils.build_s2_composite(aoi, "2019-06-01", "2019-09-30", add_ndvi=False).clip(aoi)
     s2_projection = s2.select("B4").projection()
 
-    mapbiomas = ee.Image(MAPBIOMAS_ASSET)
+    mapbiomas = ee.Image(mapbiomas_legend.MAPBIOMAS_ASSET)
     from_codes, to_codes = mapbiomas_legend.remap_expression("classification_2019")
     label = mapbiomas.select("classification_2019").remap(from_codes, to_codes, defaultValue=0).rename("label")
 

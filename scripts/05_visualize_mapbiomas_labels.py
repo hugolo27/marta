@@ -1,5 +1,5 @@
 """MapBiomas labels remapped to bosque/pasto/cultivo over the AOI, both periods
-(phase1-dataset-build 4.1). Usage: .venv/bin/python scripts/visualize_mapbiomas_labels.py ->
+(phase1-dataset-build 4.1). Usage: .venv/bin/python scripts/05_visualize_mapbiomas_labels.py ->
 writes data/study_area/labels_<period>.png (not versioned)."""
 
 import json
@@ -14,7 +14,6 @@ import mapbiomas_legend
 AOI_PATH = Path(__file__).resolve().parents[1] / "data" / "study_area" / "aoi.geojson"
 OUT_DIR = Path(__file__).resolve().parents[1] / "data" / "study_area"
 
-MAPBIOMAS_ASSET = "projects/mapbiomas-public/assets/chaco/lulc/collection5/mapbiomas_chaco_collection5_integration_v2"
 PERIODS = ["2019", "2023"]
 
 # 0=other (gray), 1=bosque (green), 2=pasto (tan), 3=cultivo (magenta)
@@ -29,7 +28,7 @@ def load_aoi():
 def main():
     gee_session.init()
     aoi = load_aoi()
-    mapbiomas = ee.Image(MAPBIOMAS_ASSET)
+    mapbiomas = ee.Image(mapbiomas_legend.MAPBIOMAS_ASSET)
 
     for period in PERIODS:
         band = f"classification_{period}"

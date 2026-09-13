@@ -5,6 +5,8 @@ docs/FOUNDATION.md point 4, derived via temporal comparison instead). Critical: 
 ("Pastura", managed pasture) != codes 11/12/42/43/44 ("Pastizal", natural grassland) despite the
 similar names — only 15 counts as "pasto"."""
 
+MAPBIOMAS_ASSET = "projects/mapbiomas-public/assets/chaco/lulc/collection5/mapbiomas_chaco_collection5_integration_v2"
+
 BOSQUE = [3, 4, 6, 45]  # natural wooded vegetation
 PASTO = [15]  # managed pasture only, not natural grassland
 CULTIVO = [18, 19, 57, 58, 36, 9]  # agriculture + plantations

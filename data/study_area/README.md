@@ -28,7 +28,7 @@ Re-verified 2026-08-20 by pulling the actual PD text (`Corazon-Verde-del-Chaco-P
 
 ## GEDI L4A feasibility check (task 3)
 
-Checked with `scripts/gedi_feasibility_check.py` (2026-08-20): 39 GEDI L4A (V3) granules intersect
+Checked with `scripts/02_gedi_feasibility_check.py` (2026-08-20): 39 GEDI L4A (V3) granules intersect
 the AOI's bounding box across the full mission span (2019-04 to 2023-03). Of the shots that
 actually fall inside the AOI polygon (not just the granule's bbox), **40,257 footprints**, of
 which **3,823 pass `l4a_quality_flag_rel3`** — roughly 18.6 quality-passing footprints per 100 ha

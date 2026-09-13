@@ -2,7 +2,7 @@
 FAO GAUL (no new file needed). Held-out: Filadelfia box, distant from the AOI but same
 vegetation, reserved for the generalization check (phase5-predictive-model).
 
-Usage: .venv/bin/python scripts/define_sampling_footprint.py -> writes
+Usage: .venv/bin/python scripts/03_define_sampling_footprint.py -> writes
 data/study_area/sampling_footprint.png (not versioned)."""
 
 import json

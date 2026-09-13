@@ -1,0 +1,58 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "AOI actual (usado para entrenar) - Figura 2.2",
+        "source": "data/study_area/aoi.geojson - digitalizado a mano, sin grilla de coordenadas visible en la figura de origen",
+        "precision": "aproximado, baja confianza",
+        "created": "2026-08-13"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-58.45, -22.5],
+          [-58.366667, -22.5],
+          [-58.366667, -22.283333],
+          [-58.45, -22.283333],
+          [-58.45, -22.5]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Propiedad total Atenil S.A. - KML real del Registro Verra",
+        "source": "data/study_area/source_documents/atenil_property_verra_registry.kml - descargado por Hugo directo del Registro Verra (registry.verra.org, VCS 2611). Placemark 'Atenil1', atributo LandCover=Atenil1.",
+        "precision": "validado: area geodesica calculada (31,867.6 ha via pyproj.Geod) coincide a 0.03% con el atributo Hectares=31858.6 del propio KML y con el texto del PD (ambos idiomas). Bounding box coincide casi exacto con el rectangulo UTM leido de la Figura 2.10, cross-validado por dos fuentes independientes.",
+        "area_ha_declarada": 31858.6,
+        "vertices": 69,
+        "nota": "Esta es la propiedad ENTERA de Atenil (probablemente el KML de 'grouped project boundary' que menciona el PD), NO el area REDD+-elegible especifica (20,515 ha, 'Project Area' en el PD). Falta conseguir ese segundo KML si existe por separado en el registro."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-58.439942, -22.511042], [-58.435722, -22.511053], [-58.435621, -22.511053], [-58.435602, -22.511053], [-58.431548, -22.511062], [-58.420857, -22.511087], [-58.407085, -22.511118], [-58.405779, -22.511121], [-58.40373, -22.511125], [-58.376233, -22.511188], [-58.374077, -22.511193], [-58.347627, -22.511253], [-58.34553, -22.511257], [-58.345527, -22.509488], [-58.345498, -22.493189], [-58.345365, -22.417673], [-58.345357, -22.413251], [-58.345345, -22.406299], [-58.345343, -22.405621], [-58.345343, -22.405604], [-58.345343, -22.405434], [-58.345342, -22.405217], [-58.34533, -22.401314], [-58.345283, -22.385921], [-58.34524, -22.371875], [-58.345142, -22.340261], [-58.344946, -22.275662], [-58.378647, -22.275663], [-58.425327, -22.275663], [-58.426604, -22.275663], [-58.435393, -22.275663], [-58.436132, -22.275663], [-58.463967, -22.275663], [-58.463967, -22.279176], [-58.463965, -22.339231], [-58.463965, -22.353171], [-58.463965, -22.360863], [-58.463965, -22.374179], [-58.463965, -22.385007], [-58.463965, -22.38507], [-58.463965, -22.385196], [-58.463965, -22.38525], [-58.463965, -22.386012], [-58.463965, -22.390889], [-58.463965, -22.396123], [-58.463965, -22.397885], [-58.463965, -22.402174], [-58.463965, -22.402665], [-58.463965, -22.402884], [-58.463965, -22.404414], [-58.463965, -22.408356], [-58.463965, -22.40896], [-58.463965, -22.409722], [-58.463965, -22.409994], [-58.463965, -22.410267], [-58.463965, -22.410313], [-58.463965, -22.410972], [-58.463965, -22.413192], [-58.463965, -22.434342], [-58.463965, -22.438081], [-58.463966, -22.469004], [-58.463966, -22.474762], [-58.463967, -22.485255], [-58.463967, -22.488601], [-58.463967, -22.488796], [-58.463967, -22.491937], [-58.463967, -22.498889], [-58.463967, -22.510978], [-58.439942, -22.511042]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "DESCARTADO - lectura incorrecta de la grilla de la Figura 2.12",
+        "source": "PD 2023.02.28, Figura 2.12 'Map of the Project Area for the initial project instance'",
+        "precision": "INCORRECTO, confirmado: el area geodesica de este rectangulo da 15,835 ha, menor que las 20,515 ha reales del area REDD+ - matematicamente imposible si el rectangulo delimitara la figura completa. Solo se leyeron 2 de las lineas de grilla visibles, no el ancho real del mapa (su propia barra de escala muestra ~20km de ancho, no los ~8.6km que este rectangulo implica). Mantenido en el archivo solo como registro del error, NO USAR. Ver figura_2.12_project_area_300dpi.png (300dpi) para georeferenciar de verdad en QGIS.",
+        "area_ha_declarada_en_PD": 20515.0
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-58.416667, -22.5],
+          [-58.333333, -22.5],
+          [-58.333333, -22.333333],
+          [-58.416667, -22.333333],
+          [-58.416667, -22.5]
+        ]]
+      }
+    }
+  ]
+}

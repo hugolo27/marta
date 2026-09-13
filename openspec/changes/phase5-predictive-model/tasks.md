@@ -6,7 +6,7 @@
 ## 2. Historical land cover series
 
 - [ ] 2.1 Build a multi-year MapBiomas Chaco land cover series for the AOI, verified by confirming at least one year can be held out for backtesting (spec: "Sufficient historical depth available")
-- [ ] 2.2 Document the series' year range and any gaps in `docs/PIPELINE.md`
+- [ ] 2.2 Document the series' year range and any gaps in `docs/METODOLOGIA_PIPELINE.md`
 
 ## 3. Driver and suitability layers
 

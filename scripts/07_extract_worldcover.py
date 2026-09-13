@@ -3,7 +3,7 @@ sub-region (never used for training) as the independent accuracy cross-check are
 has no managed-pasture-vs-natural-grassland split like MapBiomas does, so its Grassland (30)
 class is only a weak proxy for "pasto" here (bosque/cultivo cross-checks are solid).
 
-Usage: .venv/bin/python scripts/extract_worldcover.py"""
+Usage: .venv/bin/python scripts/07_extract_worldcover.py"""
 
 import json
 import urllib.request

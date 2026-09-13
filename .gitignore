@@ -21,6 +21,13 @@ data/*
 !data/study_area
 data/study_area/*.png
 data/study_area/dataset/
+data/study_area/dataset_prebugfix_backup/
+data/study_area/dataset_preclip_backup/
+data/study_area/dataset_pre3heldout_backup/
+data/study_area/dataset_pre400_backup/
+notebooks/*.zip
+data/study_area/source_documents/*.pdf
+data/study_area/source_documents/*.png
 *.tif
 *.tiff
 *.nc
@@ -33,10 +40,10 @@ checkpoints/
 outputs/
 logs/
 mlruns/
+mlflow.db
+mlartifacts/
 .claude/
 CLAUDE.md
 research_docs/
 context.md
-docs/PIPELINE.md
-docs/PIPELINE_SIMPLE.md
-profe.jpeg
+docs/RECORRIDO_PASO_A_PASO.md
