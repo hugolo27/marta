@@ -1,0 +1,26 @@
+{
+  "unclassified": {
+    "pixels": 1298551,
+    "ha": 12985.5
+  },
+  "no_change": {
+    "pixels": 1813413,
+    "ha": 18134.1
+  },
+  "bosque_a_pasto": {
+    "pixels": 100737,
+    "ha": 1007.4
+  },
+  "pasto_a_bosque": {
+    "pixels": 118074,
+    "ha": 1180.7
+  },
+  "cultivo_a_bosque": {
+    "pixels": 5032,
+    "ha": 50.3
+  },
+  "cultivo_a_pasto": {
+    "pixels": 24193,
+    "ha": 241.9
+  }
+}

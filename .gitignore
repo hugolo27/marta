@@ -33,6 +33,7 @@ data/study_area/source_documents/*.png
 *.nc
 *.h5
 *.hdf5
+*.npy
 *.pt
 *.pth
 *.ckpt

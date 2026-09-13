@@ -1,0 +1,27 @@
+{
+  "no_change": {
+    "n_px": 1809459,
+    "agree_px": 1796419,
+    "agreement": 0.993
+  },
+  "bosque_a_pasto": {
+    "n_px": 100139,
+    "agree_px": 0,
+    "agreement": 0.0
+  },
+  "pasto_a_bosque": {
+    "n_px": 117924,
+    "agree_px": 5583,
+    "agreement": 0.047
+  },
+  "cultivo_a_bosque": {
+    "n_px": 4997,
+    "agree_px": 0,
+    "agreement": 0.0
+  },
+  "cultivo_a_pasto": {
+    "n_px": 23049,
+    "agree_px": 0,
+    "agreement": 0.0
+  }
+}

@@ -19,6 +19,7 @@ MAX_EPOCHS = 100
 EARLY_STOP_PATIENCE = 10
 DROPOUT = 0.4
 OUT_DIR = Path(__file__).resolve().parents[1] / "data" / "study_area"
+CHECKPOINT_PATH = OUT_DIR / "cnn_checkpoint.pt"
 
 
 class SmallCNN(nn.Module):
@@ -112,6 +113,22 @@ def evaluate(model, device, split="test"):
     return classifier_report.evaluate_predictions(y_true, y_pred)
 
 
+def save_checkpoint(model, seed, path=CHECKPOINT_PATH):
+    """Persists trained weights so a downstream script (phase1-temporal-comparison) can apply
+    the exact same decision boundary to more than one date, instead of retraining per use --
+    every prior phase1-classifier script trained transiently since none needed that (design.md)."""
+    torch.save({"state_dict": model.state_dict(), "seed": seed}, path)
+
+
+def load_checkpoint(path=CHECKPOINT_PATH, device=None):
+    device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+    checkpoint = torch.load(path, map_location=device)
+    model = SmallCNN().to(device)
+    model.load_state_dict(checkpoint["state_dict"])
+    model.eval()
+    return model, device
+
+
 def plot_training_curve(history, out_path=OUT_DIR / "cnn_training_curve.png"):
     import matplotlib.pyplot as plt
 
@@ -135,6 +152,8 @@ def main():
     plot_training_curve(history)
     results = evaluate(model, device)
     classifier_report.print_evaluation(results, "CNN")
+    save_checkpoint(model, seed=42)
+    print(f"checkpoint saved: {CHECKPOINT_PATH}")
 
 
 if __name__ == "__main__":
