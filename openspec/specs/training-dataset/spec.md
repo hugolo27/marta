@@ -1,8 +1,10 @@
+# training-dataset Specification
+
 ## Purpose
 
 Produces the Sentinel-2 + MapBiomas Chaco dataset — imagery composites, resolution-matched labels, and a held-out accuracy cross-check — that the classifier, baseline, and temporal comparison all consume as their single source of training and evaluation data.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Cloud-free Sentinel-2 composites
 The system SHALL produce cloud-free Sentinel-2 L2A composites (13 bands plus spectral indices) over the AOI and the wider sampling footprint, for at least two time periods sufficient for both classifier training and temporal change comparison.
@@ -37,8 +39,12 @@ The system SHALL assess real cloud coverage over the sampling footprint for the 
 - **THEN** the system flags the gap and records that Sentinel-1 SAR (or an alternative period) is needed, rather than silently shipping a degraded composite
 
 ### Requirement: Dataset output format and splits
-The system SHALL define and produce the dataset in a documented patch/tile format with train/val/test splits, including a designated held-out sub-region within the wider Chaco sampling footprint reserved for a later cross-region generalization check.
+The system SHALL define and produce the dataset in a documented patch/tile format with train/val/test splits, including one or more designated held-out sub-regions within the wider Chaco sampling footprint — spanning distinct landscape topologies, not just one — reserved for a later cross-region generalization check, and SHALL assign splits consistently across every time period a location appears in, not independently per period.
 
 #### Scenario: Dataset assembled
 - **WHEN** the composites and aligned labels are ready
-- **THEN** the system outputs patches in the documented format, partitioned into train/val/test, with the generalization held-out sub-region excluded from all three
+- **THEN** the system outputs patches in the documented format, partitioned into train/val/test, with every held-out sub-region excluded from all three
+
+#### Scenario: A location appears in more than one time period
+- **WHEN** the same geographic location is sampled in more than one time period (e.g. its land cover changed between periods, or its MapBiomas classification happened to draw it in both)
+- **THEN** the system assigns that location's split once, consistently across every period it appears in, so no period-vs-period pair can leak the same location across a train/test boundary
