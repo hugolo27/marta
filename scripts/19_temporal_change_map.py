@@ -103,8 +103,14 @@ def plot_change_map(change, out_path):
 
 
 def pixel_to_wgs84(row, col, meta):
+    """Pixel *center*, not its top-left corner -- found via phase1-grad-cam task 3.1's stricter
+    check (re-pulling this exact pixel and comparing the CNN's prediction against the recorded
+    class): the corner convention put the query region ~5m off from the actual pixel, which was
+    enough to flip a prediction right at a bosque/pasto boundary pixel (already known to be a
+    marginal case, per the ~5% MapBiomas agreement on this transition type)."""
     minx, _, _, maxy = meta["aoi_utm_bounds"]
-    x, y = minx + col * meta["pixel_m"], maxy - row * meta["pixel_m"]
+    x = minx + (col + 0.5) * meta["pixel_m"]
+    y = maxy - (row + 0.5) * meta["pixel_m"]
     to_wgs84 = pyproj.Transformer.from_crs(meta["utm_crs"], "EPSG:4326", always_xy=True).transform
     return to_wgs84(x, y)
 
