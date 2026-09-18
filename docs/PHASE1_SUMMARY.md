@@ -254,11 +254,10 @@ binaries. They're not part of this PR as a result. Happy to attach a specific se
 directly if visuals would help the review — flag which ones and we'll add them as an
 explicit exception.
 
-## Open item for the tutor
+## Next capability, planned
 
-`phase5-predictive-model` (a spatiotemporal forecasting extension, proposed in
-conversation) is planned but not started — still needs confirmation on whether it's
-required core or an optional addition. See
+`phase5-predictive-model` (a spatiotemporal forecasting extension) is planned but not
+started. See
 [`openspec/changes/phase5-predictive-model/proposal.md`](../openspec/changes/phase5-predictive-model/proposal.md).
 
 ## Current status and what's next
