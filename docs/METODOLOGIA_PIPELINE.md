@@ -41,7 +41,7 @@ flowchart TD
     DELTA --> AUDIT
     PDD --> AUDIT
 
-    subgraph PRED["Predicción, cambio futuro (propuesta)"]
+    subgraph PRED["Predicción, cambio futuro"]
         HIST["Serie histórica MapBiomas<br/>1985-2023"]
         DRIVERS["Variables explicativas"]
         MARKOVDL["CA-Markov vs. modelo<br/>espaciotemporal"]
@@ -215,7 +215,7 @@ factores estándar del IPCC: fracción de carbono 0,47, factor raíz-tallo entre
 zona ecológica, y relación molecular CO2:C de 3,67. Se incluye biomasa subterránea para no reportar
 solo el carbono aéreo.
 
-### 3.3 Predicción de cambio futuro (propuesta, pendiente de confirmar si es obligatoria u opcional)
+### 3.3 Predicción de cambio futuro
 
 "Serie histórica multianual" se refiere puntualmente a usar la profundidad temporal completa de
 MapBiomas Chaco (39 capas anuales, 1985-2023), en lugar del par de fechas que usa la clasificación
@@ -402,9 +402,6 @@ metodológico válido, no una falla del diseño.
 - Variables explicativas del modelo predictivo: tenencia de tierra y área protegida no tienen
   fuente identificada. Red vial y pendiente tienen fuente estándar disponible pero todavía no
   incorporada.
-- El componente de predicción (3.3) no forma parte de la metodología retrospectiva originalmente
-  acordada. Falta confirmar si es un componente obligatorio del núcleo del TFM o una extensión
-  opcional.
 - ~~Cuál modelo usa el sistema como clasificador operativo (RF o CNN) está en revisión~~ — **resuelto,
   2026-09-13**: CNN confirmada como clasificador operativo, con la limitación de Filadelfia
   documentada explícitamente. Ver sección 5.4.

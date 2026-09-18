@@ -22,4 +22,4 @@
 
 ## 5. Tutor sign-off
 
-- [x] 5.1 Confirm the chosen area with the tutor, or capture their preferred alternative, before treating the AOI as final — confirmed by Parra, AOI is final
+- [x] 5.1 Confirm the chosen area with the tutor, or capture their preferred alternative, before treating the AOI as final — confirmed by the tutor, AOI is final

@@ -34,6 +34,5 @@ See `proposal.md` - Why. This design covers the predictive extension's technical
 
 ## Open Questions
 
-- Is the predictive extension a required core component of the TFM or an optional one? Raised by the tutor in conversation, not resolved yet — doesn't change this design's approach, but does affect how much of it needs to be finished for the October 2026 prototype deadline.
 - Are Lang et al.'s (ETH Global Canopy Height) model code/weights public and re-runnable on Sentinel-2 composites from years other than 2020? Would allow reconstructing a real canopy-height series instead of relying solely on the transition-delta bridge — worth investigating as a future improvement, not blocking this design.
 - Has GEDI L4A's mission coverage for the AOI extended past the March 2023 cutoff found in the `phase1-define-study-area` feasibility check (the mission had a pause and later resumed)? Worth re-running that check; would only strengthen the historical carbon-delta inputs this design depends on, not change the approach.
