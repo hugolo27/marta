@@ -48,3 +48,5 @@ CLAUDE.md
 research_docs/
 context.md
 docs/TFM_DRAFT.md
+*.pptx
+thesis/*.pdf

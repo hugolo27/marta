@@ -79,9 +79,9 @@ def main():
     axes[0].imshow(rgb)
     axes[0].set_title("Sentinel-2 real (RGB), 2023")
     axes[1].imshow(palette_rgb[rf_pred])
-    axes[1].set_title("Random Forest (ganador)")
+    axes[1].set_title("Random Forest (baseline)")
     axes[2].imshow(palette_rgb[cnn_pred])
-    axes[2].set_title("CNN (candidata)")
+    axes[2].set_title("CNN (clasificador operativo)")
     for ax in axes:
         ax.axis("off")
 
