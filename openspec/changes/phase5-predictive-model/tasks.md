@@ -1,6 +1,6 @@
 ## 1. Scope confirmation
 
-- [ ] 1.1 Confirm with Parra whether the predictive extension is required core or optional, and record the answer in `research_docs/BITACORA_FASES.md` and this change's `design.md` (Open Questions)
+- [x] 1.1 Confirmed with the tutor. Recorded in `research_docs/BITACORA.md`
 - [ ] 1.2 Re-run the GEDI L4A feasibility check for the AOI (reuse/extend the script from `phase1-define-study-area`) to see if mission coverage now extends past the March 2023 cutoff found previously, and record the result
 
 ## 2. Historical land cover series

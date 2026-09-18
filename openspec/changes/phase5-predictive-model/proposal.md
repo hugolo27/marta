@@ -1,6 +1,6 @@
 ## Why
 
-Every capability in the project so far is retrospective: it classifies and quantifies change that already happened (Fase 1: detection, Fase 2: carbon for observed change). The tutor separately suggested, in conversation, that the project also produce a forward-looking view — given the change already observed in the AOI's historical record, predict how the terrain is likely to behave next, and what CO2e that implies. This isn't part of his originally documented 6-phase methodology (`research_docs/METODOLOGIA_TUTOR.md`, entirely stock-based/retrospective), so it's tracked here as an explicit, separately-scoped addition rather than folded into an existing phase — including the open question of whether it's required core or optional, which still needs his confirmation.
+Every capability in the project so far is retrospective: it classifies and quantifies change that already happened (Fase 1: detection, Fase 2: carbon for observed change). The tutor separately suggested, in conversation, that the project also produce a forward-looking view — given the change already observed in the AOI's historical record, predict how the terrain is likely to behave next, and what CO2e that implies. This isn't part of his originally documented 6-phase methodology (`research_docs/METODOLOGIA_TUTOR.md`, entirely stock-based/retrospective), so it's tracked here as an explicit, separately-scoped addition rather than folded into an existing phase.
 
 ## What Changes
 
@@ -24,5 +24,5 @@ Every capability in the project so far is retrospective: it classifies and quant
 
 - New driver/covariate data sourcing (roads, cleared-edge distance, terrain, tenure) not previously part of the pipeline — none identified yet, this change's design/tasks need to source them.
 - Depends conceptually on: the AOI (`study-area`, already resolved), a multi-year MapBiomas land cover series for the AOI, and the historical carbon-density-per-transition-type figures produced by the Fase 1 classification pipeline and the Fase 2 carbon pipeline — neither of which exists as an OpenSpec change yet. This proposal does not block on those changes existing, but implementation (`/opsx:apply`) does depend on their outputs being available.
-- Updates `docs/FOUNDATION.md` and `docs/METODOLOGIA_PIPELINE.md` (already done ahead of this proposal, during design discussion) to reflect the predictive extension as a candidate pending tutor confirmation on required-vs-optional status.
+- Updates `docs/FOUNDATION.md` and `docs/METODOLOGIA_PIPELINE.md` to reflect the predictive extension.
 - No code, training, or data pipeline work happens in this change — planning artifacts only.
