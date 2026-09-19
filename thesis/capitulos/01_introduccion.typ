@@ -18,8 +18,10 @@ Esto genera dos problemas concretos:
 + *Falta de trazabilidad*: no hay forma sistemática de auditar _por qué_ un sistema
   (humano o automático) concluyó que hubo o no deforestación, ni de contrastar si las
   hectáreas y toneladas reclamadas por un proyecto coinciden con lo observable por
-  satélite -- lo que ha derivado en casos documentados de sobreemisión de créditos a
-  nivel global.
+  satélite. Las evaluaciones independientes de proyectos REDD+ de primera generación
+  documentan una sobreemisión sustancial de créditos, pero la ubican sobre todo en cómo
+  se construyó la línea base (áreas de referencia y modelado _ex ante_) y no en cómo se
+  midió la cobertura forestal @swinfield2026overcrediting.
 
 == Pregunta de investigación
 
@@ -64,12 +66,15 @@ reporte de monitoreo (MRV).
 *Incluido*: clasificación CNN sobre un área acotada del Chaco evaluada contra un baseline
 Random Forest, Grad-CAM evaluado cualitativamente como mecanismo de auditoría, una
 estimación de carbono/CO2 calibrada con GEDI, una extensión predictiva (CA-Markov vs.
-_deep learning_ espaciotemporal, pendiente de confirmación sobre si es núcleo obligatorio
-u opcional), una demo de auditoría contra un proyecto real registrado, un prototipo
-funcional/demostrable, y este documento con su defensa.
+_deep learning_ espaciotemporal, confirmada como núcleo obligatorio por el tutor), una
+demo de auditoría contra un proyecto real registrado (verificación independiente de la
+parte _observada_ de sus reportes de monitoreo, sin evaluar adicionalidad ni línea base),
+un prototipo funcional/demostrable, y este documento con su defensa.
 
 *Fuera de alcance*: reemplazar al auditor VVB o producir un reporte legalmente válido
 ante Verra, procesar todo el Chaco o construir un sistema nacional de monitoreo en tiempo
-real, construir el producto SaaS completo, trabajo de campo original para validación
+real, construir el producto SaaS completo, evaluar la adicionalidad o la línea base de un
+proyecto (p. ej., contra áreas de control emparejadas; queda como trabajo futuro),
+trabajo de campo original para validación
 _in situ_, y reservorios de carbono más allá de biomasa aérea/subterránea (madera muerta,
 hojarasca y carbono del suelo quedan excluidos y documentados como limitación).

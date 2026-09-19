@@ -38,5 +38,5 @@ typst watch thesis/main.typ thesis/main.pdf
   (`[completar]`) — este repo no nombra al tutor fuera de `README.md`, así que completar
   eso a mano en la copia final antes de enviar, no en este archivo versionado.
 - Sección de resultados de Fase 2, 3, 4 a medida que existan.
-- Resultado de la barrida de hiperparámetros (`data/study_area/hyperparameter_sweep_results.json`)
-  una vez corrida — hay un TODO marcado en el capítulo de resultados.
+- Resultados de Grad-CAM y de la comparación temporal (Fase 1, ya hechos) todavía no están
+  en el capítulo de resultados.

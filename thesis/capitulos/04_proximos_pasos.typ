@@ -10,7 +10,7 @@
   [4], [Demo de auditoría (Corazón Verde del Chaco) + prototipo integrado], [Pendiente],
   [5 #footnote[Extensión propuesta por el tutor en conversación; no forma parte de la metodología de 6 fases originalmente documentada.]],
   [Modelo predictivo: CA-Markov vs. deep learning espaciotemporal],
-  [Solo planning, pendiente confirmar si es obligatorio],
+  [Solo planning, confirmada como obligatoria por el tutor],
 )
 
 Este capítulo se amplía a medida que cada fase se completa -- ver el capítulo de
