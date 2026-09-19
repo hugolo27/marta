@@ -12,8 +12,9 @@ REDD+ projects need to demonstrate how much forest they hold and how much carbon
 stores. The gap isn't automation — monitoring tools already run at scale (Global Forest
 Watch, MapBiomas itself) — it's that none of them give auditable evidence *per individual
 prediction*: no way to check why a specific area was classified as deforestation, or how
-a claimed CO2 figure was reached. A 2025 study in *Science* found REDD+ projects issue on
-average 10.7x more credits than their own baselines justify.
+a claimed CO2 figure was reached. A 2026 synthesis in *Nature Communications* (Swinfield et al.)
+of independent evaluations of 44 first-generation REDD+ projects found they claimed 10.7 times
+more avoided deforestation than those evaluations justify (95% CI: 5.4-26.5).
 
 **Research question**: can a system be built, on free satellite imagery, that classifies
 land cover with interpretable per-prediction evidence, and translates detected change
