@@ -6,7 +6,7 @@ schema: spec-driven
 context: |
   Final Master's Project (FP-UNA, MIAyCD). A satellite verification
   pipeline for the REDD+ carbon credit market in the Paraguayan Chaco: land cover classification
-  (forest/pasture/clearing/crop) with a CNN over Sentinel-2, ground truth from MapBiomas Chaco,
+  (forest/pasture/crop per date; clearing derived from two dates) with a CNN over Sentinel-2, ground truth from MapBiomas Chaco,
   Grad-CAM interpretability for auditability, feeding into a calibrated carbon/CO2 estimate.
   Core scope (see docs/FOUNDATION.md): dataset build, multiband CNN, Random Forest baseline,
   temporal change comparison, Grad-CAM, carbon estimation (pretrained canopy height inference +

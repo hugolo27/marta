@@ -6,7 +6,7 @@ Trabajo Final de Maestría (TFM) para la Maestría en Inteligencia Artificial y 
 
 ## Sobre el proyecto
 
-MARTA clasifica cobertura de suelo (bosque / pasto / desmonte / cultivo) sobre imágenes Sentinel-2 del Chaco paraguayo usando una CNN, y suma interpretabilidad (Grad-CAM) para que cada predicción sea auditable en vez de una caja negra. Aplica al contexto del monitoreo (MRV) de proyectos REDD+ en el mercado de créditos de carbono.
+MARTA clasifica cobertura de suelo (bosque / pasto / cultivo por fecha; el desmonte se deriva comparando dos fechas) sobre imágenes Sentinel-2 del Chaco paraguayo usando una CNN, y suma interpretabilidad (Grad-CAM) para que cada predicción sea auditable en vez de una caja negra. Aplica al contexto del monitoreo (MRV) de proyectos REDD+ en el mercado de créditos de carbono.
 
 El planteamiento completo (pregunta de investigación, objetivos, alcance y fuera de alcance) está en [`docs/FOUNDATION.es.md`](docs/FOUNDATION.es.md).
 

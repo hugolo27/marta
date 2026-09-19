@@ -1,6 +1,6 @@
 # Study area
 
-Satisfies the `study-area` capability spec at `openspec/changes/phase1-define-study-area/specs/study-area/spec.md`.
+Satisfies the `study-area` capability spec at `openspec/specs/study-area/spec.md`.
 
 ## Source and selection
 
@@ -49,4 +49,4 @@ the Chaco, not a red flag specific to this AOI.
 
 - [x] Boundary approximated and documented (tasks 1.1–1.3, 4.1)
 - [x] GEDI L4A feasibility check (task 3) — GO, see above
-- [ ] Tutor sign-off (task 5) — last thing blocking this AOI being final
+- [x] Tutor sign-off (task 5) — confirmed, this AOI is final

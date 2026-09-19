@@ -1,5 +1,5 @@
 """Shared Earth Engine session init. Service account auth — interactive auth is blocked for
-this project's Google accounts (see research_docs/BITACORA_FASES.md, 2026-08-20)."""
+this project's Google accounts (see research_docs/BITACORA.md, 2026-08-20)."""
 
 import os
 
