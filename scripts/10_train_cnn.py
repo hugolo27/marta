@@ -70,15 +70,15 @@ def seed_everything(seed):
     torch.manual_seed(seed)
 
 
-def train(seed=42, verbose=True):
+def train(seed=42, verbose=True, batch_size=BATCH_SIZE, lr=LEARNING_RATE, dropout=DROPOUT):
     seed_everything(seed)
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    train_loader = DataLoader(dl.PatchDataset("train", augment=True), batch_size=BATCH_SIZE, shuffle=True)
-    val_loader = DataLoader(dl.PatchDataset("val", augment=False), batch_size=BATCH_SIZE)
+    train_loader = DataLoader(dl.PatchDataset("train", augment=True), batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(dl.PatchDataset("val", augment=False), batch_size=batch_size)
 
-    model = SmallCNN().to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    model = SmallCNN(dropout=dropout).to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     history = {"train_loss": [], "val_loss": [], "train_acc": [], "val_acc": []}
     best_val_loss, patience_left, best_state = float("inf"), EARLY_STOP_PATIENCE, None

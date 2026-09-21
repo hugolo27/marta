@@ -185,6 +185,21 @@ criterio → no hace falta sumar Sentinel-1 SAR para cubrir huecos.
 | CNN | Dropout | 0,4 | Rango estándar (0,3-0,5) para un conjunto de entrenamiento acotado (~280 ejemplos por clase), donde el riesgo de sobreajuste es real |
 | CNN | Aumentado de datos | Rotaciones de 90°/180°/270° y espejado | Válido para imágenes satelitales vistas cenitalmente. No se aplica aumentado de color o brillo: los valores de reflectancia de Sentinel-2 tienen significado físico, y distorsionarlos podría dañar la señal en lugar de mejorar la generalización |
 
+Estos valores se fijaron una sola vez, citando rango estándar de literatura, y no se ajustaron
+empíricamente durante el desarrollo. Lo que sí cambió el resultado final de la sección 5, en varias
+rondas, fueron bugs de pipeline (semilla de aumentado, distorsión de zona UTM, fuga espacial) y
+decisiones de diseño de datos (volumen de entrenamiento, unificación de splits entre períodos) —
+ninguno de los dos es un ajuste de hiperparámetro del modelo.
+
+**Barrida de sensibilidad, corrida a posteriori** (un parámetro a la vez, valores del resto fijos
+en su default, `data/study_area/hyperparameter_sweep_results.json`): la elección de rango estándar
+se sostiene empíricamente en 4 de 5 parámetros (RF `n_estimators`/`max_depth`, CNN
+`dropout`/`batch_size` igualan o superan a las alternativas probadas). La excepción es
+`learning_rate` de la CNN: 0,0001 dio 0,850 ± 0,007 contra 0,843 ± 0,016 del valor usado (0,001) —
+diferencia chica, con rangos solapados a 3 semillas, no confirmada como señal real frente al ruido.
+No se retrenó el checkpoint de referencia con este valor sin antes correr una comparación formal de
+5 semillas equivalente a la de la sección 5.1.
+
 El criterio de comparación entre modelos se fija antes de observar resultados: ambos se entrenan y
 evalúan en 5 corridas con distinta semilla aleatoria (que afecta la inicialización y el muestreo
 interno de cada modelo, no la partición de datos, que permanece fija entre corridas), se mide el

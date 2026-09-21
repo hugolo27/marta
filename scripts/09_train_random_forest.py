@@ -12,12 +12,12 @@ import dataset_loader as dl
 N_ESTIMATORS = 400
 
 
-def train(seed=42, verbose=True):
+def train(seed=42, verbose=True, n_estimators=N_ESTIMATORS, max_depth=None):
     X_train, y_train = dl.load_pixel_features("train")
     if verbose:
         counts = Counter(y_train)
         print("Training class distribution:", {dl.CLASS_NAMES[k]: v for k, v in sorted(counts.items())})
-    rf = RandomForestClassifier(n_estimators=N_ESTIMATORS, max_depth=None, random_state=seed, n_jobs=-1)
+    rf = RandomForestClassifier(n_estimators=n_estimators, max_depth=max_depth, random_state=seed, n_jobs=-1)
     rf.fit(X_train, y_train)
     return rf
 
