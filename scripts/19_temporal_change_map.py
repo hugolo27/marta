@@ -4,8 +4,14 @@ Named transitions, not a binary changed/unchanged flag, since Fase 2's carbon es
 to know which transition happened (bosque->cultivo and bosque->pasto carry different carbon-
 density deltas, design.md). A pixel unclassified in either date is excluded, not imputed --
 same norm as phase1-classifier's masked-pixel handling.
-Usage: .venv/bin/python scripts/19_temporal_change_map.py"""
 
+The named-transition map turned out to be mostly noise (Hansen: 0.1 ha of loss in the AOI for
+2020-2023 vs. 1,007 ha of bosque_a_pasto), so phase1-change-detection-hardening adds the primary
+product: forest/non-forest change with optional confidence, persistence and minimum-mapping-unit
+filters (build_fnf_change_map). The named-transition map stays as a secondary, not-for-area output.
+Usage: .venv/bin/python scripts/19_temporal_change_map.py [--confidence 0.7] [--persistence] [--mmu]"""
+
+import argparse
 import json
 from pathlib import Path
 
@@ -15,6 +21,7 @@ import mlflow
 import numpy as np
 import pyproj
 from matplotlib.colors import ListedColormap
+from scipy import ndimage
 
 import gee_session
 import s2_utils
@@ -44,6 +51,13 @@ PALETTE = {
     TRANSITION_CODE[(2, 1)]: "#2563eb",  # cultivo -> pasto
 }
 
+FOREST_CLASS = CLASS_NAMES.index("bosque")
+STABLE_FOREST, STABLE_NONFOREST, LOSS, GAIN = 0, 1, 2, 3
+FNF_NAMES = {STABLE_FOREST: "stable_forest", STABLE_NONFOREST: "stable_nonforest", LOSS: "loss", GAIN: "gain"}
+FNF_PALETTE = {UNCLASSIFIED: "#9ca3af", STABLE_FOREST: "#1f8d49", STABLE_NONFOREST: "#e5e5e5", LOSS: "#d0342c", GAIN: "#2563eb"}
+MMU_PX = 50  # 0.5 ha at 10 m, the Paraguayan forest definition's minimum area
+PERSISTENCE_YEAR = "2022"
+
 VISUAL_CHECK_N = 2
 VISUAL_CHECK_HALF_SIDE_M = 300
 
@@ -54,6 +68,73 @@ def build_change_map(before, after):
     change[valid & (before == after)] = NO_CHANGE
     for (a, b), code in TRANSITION_CODE.items():
         change[valid & (before == a) & (after == b)] = code
+    return change
+
+
+def to_forest(raster):
+    """1 = forest, 0 = non-forest (pasto or cultivo), -1 = unclassified."""
+    return np.where(raster == UNCLASSIFIED, UNCLASSIFIED, (raster == FOREST_CLASS).astype(np.int64))
+
+
+def build_fnf_change(before, after):
+    f0, f1 = to_forest(before), to_forest(after)
+    change = np.full(before.shape, UNCLASSIFIED, dtype=np.int64)
+    valid = (f0 != UNCLASSIFIED) & (f1 != UNCLASSIFIED)
+    change[valid & (f0 == 1) & (f1 == 1)] = STABLE_FOREST
+    change[valid & (f0 == 0) & (f1 == 0)] = STABLE_NONFOREST
+    change[valid & (f0 == 1) & (f1 == 0)] = LOSS
+    change[valid & (f0 == 0) & (f1 == 1)] = GAIN
+    return change
+
+
+def revert(change, mask):
+    """A filtered-out change pixel falls back to its before-state: loss -> stable forest,
+    gain -> stable non-forest."""
+    out = change.copy()
+    out[mask & (change == LOSS)] = STABLE_FOREST
+    out[mask & (change == GAIN)] = STABLE_NONFOREST
+    return out
+
+
+def apply_confidence(change, proba_before, proba_after, threshold):
+    p_forest_before = proba_before[..., FOREST_CLASS].astype(np.float32)
+    p_forest_after = proba_after[..., FOREST_CLASS].astype(np.float32)
+    confident_loss = (p_forest_before >= threshold) & (1 - p_forest_after >= threshold)
+    confident_gain = (1 - p_forest_before >= threshold) & (p_forest_after >= threshold)
+    weak = ((change == LOSS) & ~confident_loss) | ((change == GAIN) & ~confident_gain)
+    return revert(change, weak)
+
+
+def apply_persistence(change, mid):
+    """Loss must already be non-forest in the year before the end date, gain already forest; an
+    unclassified mid-year can't confirm either, so it reverts too."""
+    f_mid = to_forest(mid)
+    not_persistent = ((change == LOSS) & (f_mid != 0)) | ((change == GAIN) & (f_mid != 1))
+    return revert(change, not_persistent)
+
+
+def apply_mmu(change, min_px=MMU_PX):
+    out = change
+    for code in (LOSS, GAIN):
+        labels, n = ndimage.label(out == code, structure=np.ones((3, 3), dtype=int))
+        if n == 0:
+            continue
+        sizes = np.bincount(labels.ravel())
+        small = (sizes < min_px)[labels] & (labels > 0)
+        out = revert(out, small)
+    return out
+
+
+def build_fnf_change_map(rasters, probas, confidence=None, persistence=False, mmu=False):
+    """rasters/probas: dicts keyed by year string. Filters run confidence -> persistence -> MMU,
+    so patch size is measured on what survives the other two (change_hardening/README.md)."""
+    change = build_fnf_change(rasters["2019"], rasters["2023"])
+    if confidence is not None:
+        change = apply_confidence(change, probas["2019"], probas["2023"], confidence)
+    if persistence:
+        change = apply_persistence(change, rasters[PERSISTENCE_YEAR])
+    if mmu:
+        change = apply_mmu(change)
     return change
 
 
@@ -83,6 +164,34 @@ def report_stats(change, pixel_m):
     for name, v in sorted(stats.items(), key=lambda kv: -kv[1]["ha"]):
         print(f"  {name}: {v['ha']:,.1f} ha ({v['pixels']:,} px)")
     return stats
+
+
+def report_fnf_stats(change, pixel_m):
+    stats = {}
+    for code, name in {UNCLASSIFIED: "unclassified", **FNF_NAMES}.items():
+        n = int((change == code).sum())
+        stats[name] = {"pixels": n, "ha": round(hectares(n, pixel_m), 1)}
+    assert sum(v["pixels"] for v in stats.values()) == change.size, "pixel accounting mismatch"
+    for name, v in stats.items():
+        print(f"  {name}: {v['ha']:,.1f} ha ({v['pixels']:,} px)")
+    return stats
+
+
+def plot_fnf_map(change, title, out_path):
+    codes = sorted(FNF_PALETTE)
+    cmap = ListedColormap([FNF_PALETTE[c] for c in codes])
+    fig, ax = plt.subplots(figsize=(6, 12))
+    ax.imshow(np.searchsorted(codes, change), cmap=cmap, vmin=0, vmax=len(codes) - 1, interpolation="nearest")
+    ax.axis("off")
+    ax.set_title(title)
+    labels = {UNCLASSIFIED: "sin clasificar", STABLE_FOREST: "bosque estable", STABLE_NONFOREST: "no-bosque estable",
+              LOSS: "pérdida de bosque", GAIN: "ganancia de bosque"}
+    handles = [plt.Rectangle((0, 0), 1, 1, color=FNF_PALETTE[c]) for c in codes]
+    fig.legend(handles, [labels[c] for c in codes], loc="lower center", ncol=2, frameon=False, fontsize=8)
+    fig.tight_layout(rect=[0, 0.1, 1, 1])
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+    print(f"saved: {out_path}")
 
 
 def plot_change_map(change, out_path):
@@ -149,6 +258,12 @@ def visual_check(change, meta):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--confidence", type=float, default=None)
+    parser.add_argument("--persistence", action="store_true")
+    parser.add_argument("--mmu", action="store_true")
+    args = parser.parse_args()
+
     mlflow.set_experiment(EXPERIMENT_NAME)
     with mlflow.start_run(run_name="change_map_2019_2023"):
         gee_session.init()
@@ -170,6 +285,24 @@ def main():
         plot_change_map(change, DATA_DIR / "change_map_2019_2023.png")
         mlflow.log_artifact(str(DATA_DIR / "change_map_2019_2023.png"))
         visual_check(change, meta)
+
+        years = ["2019", "2023"] + ([PERSISTENCE_YEAR] if args.persistence else [])
+        rasters = {y: np.load(DATA_DIR / f"aoi_classified_{y}.npy") for y in years}
+        probas = {y: np.load(DATA_DIR / f"aoi_proba_{y}.npy") for y in ("2019", "2023")} if args.confidence else {}
+        fnf = build_fnf_change_map(rasters, probas, args.confidence, args.persistence, args.mmu)
+        config = {"confidence": args.confidence, "persistence": args.persistence, "mmu": args.mmu}
+        print(f"\nForest/non-forest change, config {config}:")
+        fnf_stats = report_fnf_stats(fnf, meta["pixel_m"])
+        mlflow.log_params({f"fnf_{k}": v for k, v in config.items()})
+        mlflow.log_metrics({f"fnf_ha_{name}": v["ha"] for name, v in fnf_stats.items()})
+
+        np.save(DATA_DIR / "change_map_2019_2023_fnf.npy", fnf)
+        fnf_stats_path = DATA_DIR / "change_stats_2019_2023_fnf.json"
+        fnf_stats_path.write_text(json.dumps({"config": config, "stats": fnf_stats}, indent=2))
+        print(f"saved: {fnf_stats_path}")
+        mlflow.log_artifact(str(fnf_stats_path))
+        plot_fnf_map(fnf, "Bosque / no-bosque 2019 -> 2023, AOI Corazón Verde del Chaco", DATA_DIR / "change_map_2019_2023_fnf.png")
+        mlflow.log_artifact(str(DATA_DIR / "change_map_2019_2023_fnf.png"))
 
 
 if __name__ == "__main__":

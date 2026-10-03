@@ -1,0 +1,42 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "change_dev_area",
+        "hansen_loss_2020_2023_ha": 5498.2,
+        "area_ha": 19633.1,
+        "candidates_scored": 610,
+        "hansen_asset": "UMD/hansen/global_forest_change_2025_v1_13"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -58.95999999999998,
+              -20.084739438149278
+            ],
+            [
+              -58.82999999999998,
+              -20.084739438149278
+            ],
+            [
+              -58.82999999999998,
+              -19.95473943814928
+            ],
+            [
+              -58.95999999999998,
+              -19.95473943814928
+            ],
+            [
+              -58.95999999999998,
+              -20.084739438149278
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

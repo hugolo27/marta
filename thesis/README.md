@@ -39,4 +39,6 @@ typst watch thesis/main.typ thesis/main.pdf
   eso a mano en la copia final antes de enviar, no en este archivo versionado.
 - Sección de resultados de Fase 2, 3, 4 a medida que existan.
 - Resultados de Grad-CAM y de la comparación temporal (Fase 1, ya hechos) todavía no están
-  en el capítulo de resultados.
+  en el capítulo de resultados. La comparación temporal conviene escribirla después de
+  `phase1-change-detection-hardening` y `phase1-accuracy-assessment`: el mapa de cambio actual
+  sobreestima la pérdida de bosque (ver `docs/METODOLOGIA_PIPELINE.md` §8).

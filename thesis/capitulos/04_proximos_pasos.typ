@@ -4,7 +4,7 @@
   columns: (10%, 60%, 30%),
   align: (left, left, left),
   table.header([*Fase*], [*Qué cubre*], [*Estado*]),
-  [1], [Área de estudio, dataset Sentinel-2+MapBiomas, CNN, baseline RF, comparación temporal, Grad-CAM], [Completa],
+  [1], [Área de estudio, dataset Sentinel-2+MapBiomas, CNN, baseline RF, comparación temporal, Grad-CAM; validación independiente de la detección de cambio], [Implementada; validación de la detección de cambio en curso],
   [2], [Altura de dosel (inferencia) + calibración GEDI L4A + carbono/CO2], [Pendiente],
   [3], [Validación (ecuaciones alométricas y/o datos de campo)], [Pendiente],
   [4], [Demo de auditoría (Corazón Verde del Chaco) + prototipo integrado], [Pendiente],

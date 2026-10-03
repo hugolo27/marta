@@ -1,0 +1,19 @@
+{
+  "n_rows": 4,
+  "n_cols": 4,
+  "tile_core_px": 400,
+  "pixel_m": 10,
+  "utm_crs": "EPSG:32721",
+  "aoi_utm_bounds": [
+    294884.32122091064,
+    7777937.242968142,
+    308650.04812926793,
+    7792483.22578194
+  ],
+  "class_names": [
+    "bosque",
+    "pasto",
+    "cultivo"
+  ],
+  "unclassified_value": -1
+}

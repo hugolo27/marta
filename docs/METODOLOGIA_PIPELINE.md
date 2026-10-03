@@ -384,6 +384,24 @@ metodológico válido, no una falla del diseño.
 
 ## 8. Ítems abiertos
 
+- **Detección de cambio: corregida contra referencias independientes, falta el test final
+  (2026-09-24).** El mapa de cambio original del AOI reportaba 1.007 ha de `bosque_a_pasto`, pero
+  MapBiomas coincide con 0 % de esos píxeles y Hansen Global Forest Change
+  (`UMD/hansen/global_forest_change_2025_v1_13`, copa ≥ 25 %) registra 0,1 ha de pérdida en el AOI
+  en 2020-2023: era casi todo error de comisión (ruido del clasificador en el borde bosque/pasto que
+  se acumula al diferenciar dos fechas). `phase1-change-detection-hardening` cambió el producto
+  principal a cambio bosque/no-bosque y eligió el post-proceso con una regla pre-registrada
+  (hash registrado en MLflow antes de puntuar), evaluando 12 configuraciones contra Hansen y
+  MapBiomas en el AOI y en un área de desarrollo con deforestación real documentada (Alto
+  Paraguay, 4.856 ha de pérdida confirmada por ambas fuentes). Elegida: **confianza ≥ 0,7 en ambas
+  fechas + persistencia** (la pérdida tiene que estar ya en 2022). Resultado: pérdida falsa en el
+  AOI de 999,6 a 80,8 ha (−92 %, bloques de 30 m) y retención del 90,7 % de la pérdida confirmada
+  en el área de desarrollo. Las configuraciones con confianza ≥ 0,9 borraban toda la pérdida del
+  AOI pero perdían más de la mitad de la deforestación real y la regla las rechazó. Mapa final del
+  AOI: pérdida 81,9 ha, ganancia 187,7 ha (áreas mapeadas, no evaluadas). Detalle y tabla completa:
+  `data/study_area/change_hardening/README.md` y `scores.json`. Queda
+  `phase1-accuracy-assessment` (test contra puntos interpretados con la vara VM0007, áreas
+  ajustadas por error): la Fase 2 consume esas áreas ajustadas, no las mapeadas.
 - Variables explicativas del modelo predictivo: tenencia de tierra y área protegida no tienen
   fuente identificada. Red vial y pendiente tienen fuente estándar disponible pero todavía no
   incorporada.

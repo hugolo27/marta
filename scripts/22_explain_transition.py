@@ -12,7 +12,13 @@ independent-query approach silently snapped to a different pixel grid than the t
 -- close enough everywhere except right at boundary pixels like these, where it flipped the
 predicted class. Re-using the exact same tile array + slice is the only way to guarantee the
 identical window 18_classify_aoi_temporal.py itself classified on.
-Usage: .venv/bin/python scripts/22_explain_transition.py"""
+
+--fnf-loss explains forest-loss pixels of the hardened forest/non-forest map instead
+(change_map_2019_2023_fnf.npy, phase1-change-detection-hardening task 5.2), written to
+gradcam_loss_* so the named-transition images used elsewhere aren't overwritten.
+Usage: .venv/bin/python scripts/22_explain_transition.py [--fnf-loss]"""
+
+import argparse
 
 import importlib
 import json
@@ -52,6 +58,12 @@ def pick_transition_pixels(change):
     return change_map.TRANSITION_NAMES[target], [(int(rows[i]), int(cols[i])) for i in picks]
 
 
+def pick_fnf_loss_pixels(change):
+    rows, cols = np.where(change == change_map.LOSS)
+    picks = np.linspace(0, len(rows) - 1, min(N_PIXELS, len(rows)), dtype=int)
+    return "forest_loss", [(int(rows[i]), int(cols[i])) for i in picks]
+
+
 def extract_patch(composite, channels, tiles, row, col):
     """Pulls the whole padded tile containing (row, col) and slices out the exact 33x33 window
     classify_tile() itself would use for that core pixel -- see module docstring for why this,
@@ -65,9 +77,13 @@ def extract_patch(composite, channels, tiles, row, col):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--fnf-loss", action="store_true")
+    args = parser.parse_args()
+
     gee_session.init()
     meta = json.loads((DATA_DIR / "aoi_classified_grid_meta.json").read_text())
-    change = np.load(DATA_DIR / "change_map_2019_2023.npy")
+    change = np.load(DATA_DIR / ("change_map_2019_2023_fnf.npy" if args.fnf_loss else "change_map_2019_2023.npy"))
     rasters = {p: np.load(DATA_DIR / f"aoi_classified_{p}.npy") for p in PERIODS}
     model, device = train_cnn.load_checkpoint()
     print(f"Loaded checkpoint: {train_cnn.CHECKPOINT_PATH}")
@@ -79,7 +95,8 @@ def main():
     aoi_wgs84_ee = ee.Geometry(json.loads(classify_aoi.AOI_PATH.read_text())["features"][0]["geometry"])
     channels = s2_utils.S2_BANDS + ["NDVI"]
 
-    transition_name, pixels = pick_transition_pixels(change)
+    transition_name, pixels = pick_fnf_loss_pixels(change) if args.fnf_loss else pick_transition_pixels(change)
+    out_prefix = "gradcam_loss" if args.fnf_loss else "gradcam_transition"
     print(f"Explaining transition: {transition_name} ({len(pixels)} pixels)")
 
     for i, (row, col) in enumerate(pixels):
@@ -97,7 +114,7 @@ def main():
                   f"recorded={dl.CLASS_NAMES[recorded]} ({match})")
 
             result = grad_cam.guided_grad_cam(model, patch_chw, pred, device)
-            out_path = DATA_DIR / f"gradcam_transition_{i}_{period}.png"
+            out_path = DATA_DIR / f"{out_prefix}_{i}_{period}.png"
             grad_cam.render_overlay(
                 patch, result["sharpened"],
                 f"{transition_name} pixel {i}, {period} (predicted: {dl.CLASS_NAMES[pred]})",
