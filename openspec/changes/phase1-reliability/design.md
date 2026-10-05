@@ -26,9 +26,17 @@ See proposal.md for motivation. Relevant current state:
 - **Why not stratify by type:** the type is only known after interpretation, so stratifying on it would need a map of hard cases that does not exist.
 
 ### D2. Training-label audit
-- From the training split, take patches whose MapBiomas label disagrees with at least two of the other three maps (forest/non-forest level). Draw ~100 at random (fixed seed), stratified by MapBiomas class.
-- Interpret each patch's central 30 m block for its own period (2019 or 2023) on high-resolution imagery, with the same definition.
-- Report the estimated label-noise rate per class within that disagreement set and, weighted by the set's size, as a lower bound for the whole training split. Nothing is relabeled or retrained.
+- Two strata over the training split, at forest/non-forest level: patches whose MapBiomas label disagrees with at least two of the other three maps, and patches where all four agree. Sampling only the disagreement set would overstate noise and miss errors the maps share.
+- Draw ~100 patches (fixed seed): ~60 from the disagreement stratum and ~40 from the agreement stratum, each stratified by MapBiomas class, with inclusion probabilities recorded.
+- Interpret each patch's central 30 m block for its own period (2019 or 2023) with the same primary definition and attributes as `phase1-accuracy-assessment`, blind to its MapBiomas label.
+- Each disagreement is typed as a real label error, a definition difference (e.g. crown 10-25%, which is forest under the FREL and MapBiomas but not under the CDM definition) or a mixed pixel.
+- Report the noise rate per class for the whole training split (stratified estimator) and per stratum. Nothing is relabeled or retrained.
+
+### D2b. Consensus labels: only on a pre-registered trigger
+Training on consensus labels is not part of this change. It is run as a separate change only if D2 shows systematic noise in forest whose lower 95% bound exceeds 10%. If it is run:
+- Variant: weight training examples by inter-map agreement plus a small hand-labeled set of hard cases, rather than discarding disagreeing examples, which would strip the boundary examples the classifier most needs. WorldCover stays out of the labels (it is the held-out verifier).
+- Arbiter: a hand-labeled set outside the AOI and disjoint from the assessment sample (e.g. the D1 hard-case points), never MapBiomas or the consensus itself, since each model would win against its own labels.
+- Replaces the current labels only if all three hold: macro-F1 on the hand-labeled set improves by more than one combined standard deviation over 5 seeds; forest recall on hard cases drops by no more than 2 points; false change in stable control areas does not increase. CNN and RF are both retrained under the same protocol.
 
 ### D3. CNN + RF combination
 - **Calibration.** Temperature scaling for the CNN (one scalar on the logits) and Platt-style scaling of RF class probabilities, both fitted on the validation split only.

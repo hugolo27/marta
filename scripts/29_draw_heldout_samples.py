@@ -13,10 +13,12 @@ import importlib
 from pathlib import Path
 
 import ee
+import mlflow
 import numpy as np
 import pyproj
 
 import gee_session
+import reference_labels
 
 assemble = importlib.import_module("08_assemble_dataset")
 draw_aoi = importlib.import_module("27_draw_reference_sample")
@@ -27,6 +29,7 @@ N_PER_STRATUM = 50
 WC_TREE_COVER = 10
 STRATA = {1: "wc_tree", 0: "wc_other"}
 SEED = 42
+EXPERIMENT_NAME = "phase1-accuracy-assessment"
 
 
 def utm_for(lon):
@@ -59,8 +62,7 @@ def draw(name):
         p["x"], p["y"] = to_utm(p["lon"], p["lat"])
 
     with open(OUT_DIR / f"heldout_{name}_sample.csv", "w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=["point_id", "lon", "lat", "label_2023", "imagery_source_2023",
-                                          "imagery_date_2023", "flag_sparse_woody", "uninterpretable_reason", "notes"])
+        w = csv.DictWriter(f, fieldnames=reference_labels.blind_columns(("2023",)))
         w.writeheader()
         for p in points:
             w.writerow({"point_id": p["point_id"], "lon": f"{p['lon']:.7f}", "lat": f"{p['lat']:.7f}"})
@@ -81,6 +83,11 @@ def main():
     OUT_DIR.mkdir(exist_ok=True)
     for name in assemble.HELDOUT_REGIONS:
         draw(name)
+    mlflow.set_experiment(EXPERIMENT_NAME)
+    with mlflow.start_run(run_name="draw_reference_sample_heldout"):
+        mlflow.log_params({"seed": SEED, "n_per_stratum": N_PER_STRATUM, "regions": ",".join(assemble.HELDOUT_REGIONS)})
+        for name in assemble.HELDOUT_REGIONS:
+            mlflow.log_artifact(str(OUT_DIR / f"heldout_{name}_sample.csv"))
 
 
 if __name__ == "__main__":

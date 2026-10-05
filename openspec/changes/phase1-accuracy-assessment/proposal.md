@@ -14,11 +14,11 @@ Measuring the classifier against that same bar is what makes the Fase 4 audit co
 
 ## What Changes
 
-- Build an independent reference dataset for the case-study AOI: a stratified random sample over the hardened forest/non-forest change map (~275 points). Each point is visually interpreted as forest or non-forest on high-resolution imagery for 2019 and 2023, blind to the model's output, against Paraguay's forest definition.
+- Build an independent reference dataset for the case-study AOI: a stratified random sample over the hardened forest/non-forest change map, with extra strata where omission can hide (change removed by the post-processing filter, a buffer around mapped and reference loss), 340 points. Each point is visually interpreted as forest or non-forest on high-resolution imagery for 2019 and 2023, blind to the model's output, against the PD's forest definition (CDM), with Paraguay's FREL definition derived as a secondary result.
 - Assess per-date forest/non-forest accuracy (overall, user's and producer's, with confidence intervals) and report pass/fail against the VM0007 gate (≥ 50 points per class, overall accuracy ≥ 90%).
 - Estimate error-adjusted forest-loss and forest-gain areas with 95% confidence intervals (Olofsson et al., 2014). These replace mapped pixel counts as the area figure handed to Fase 2.
 - Assess 2023 forest/non-forest accuracy against interpreted reference samples in the three held-out regions (~100 points each), so generalization is measured against reference data, not only against WorldCover. This part does not block Fase 2.
-- Measure interpreter consistency with a blind repeat of a 10% subset.
+- Measure interpreter consistency with a blind repeat of a 20% subset, by a second interpreter if available.
 - Record the outcome as a decision gate.
 
 ## Capabilities
@@ -27,7 +27,7 @@ Measuring the classifier against that same bar is what makes the Fase 4 audit co
 - `map-accuracy-assessment`: independent, reference-based accuracy assessment of the per-date land cover maps and the change map, following the VM0007 accuracy requirement and Olofsson et al. (2014) area estimation, producing the error-adjusted areas that downstream carbon estimation consumes.
 
 ### Modified Capabilities
-(none — `land-cover-classifier` and `temporal-change-detection` keep their requirements; this change evaluates their outputs)
+(none: `land-cover-classifier` and `temporal-change-detection` keep their requirements; this change evaluates their outputs)
 
 ## Impact
 
@@ -35,5 +35,5 @@ Measuring the classifier against that same bar is what makes the Fase 4 audit co
 - **New scripts** under `scripts/` for sampling, estimation and the held-out assessment, plus an unnumbered estimator module.
 - **New versioned reference dataset** (points, labels, interpreter notes, KML for interpretation) and results under `data/study_area/accuracy_assessment/`, archived as VM0007 requires.
 - **Reference imagery:** Google Earth Pro historical imagery, with Esri World Imagery Wayback as a secondary source. Planet NICFI is used only if access is granted; the program's contract with Planet ended in 2025 and the project's service account has no access.
-- **Manual effort:** ~275 AOI points plus ~300 held-out points, plus ~60 repeats, each interpreted in one view. Estimated at ~6 hours, not yet measured. The AOI part (~3 hours) blocks Fase 2.
+- **Manual effort:** 340 AOI points plus ~300 held-out points, plus ~130 repeats, each interpreted in one view with crown counted on a 5×5 grid. Estimated at ~8 hours, not yet measured. The AOI part (~4-5 hours) blocks Fase 2.
 - **Updates** `docs/METODOLOGIA_PIPELINE.md` and `docs/FOUNDATION.md`/`FOUNDATION.es.md` (evaluation, point 7).

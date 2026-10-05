@@ -23,6 +23,7 @@ import accuracy_stats as st
 import dataset_loader as dl
 import gee_session
 import holdout_eval
+import reference_labels as rl
 import s2_utils
 
 assemble = importlib.import_module("08_assemble_dataset")
@@ -34,7 +35,6 @@ EXPERIMENT_NAME = "phase1-accuracy-assessment"
 PATCH_RADIUS_PX = 16
 PERIOD = ("2023-06-01", "2023-09-30")
 BATCH = 25
-LABELS = ("forest", "nonforest")
 
 
 def read_csv(path):
@@ -82,6 +82,16 @@ def classify_region(name, model, device):
     print(f"{name}: {n_ok}/{len(points)} classified, {len(points) - n_ok} unclassified (gap/not returned)")
 
 
+def accuracy(used, ref, mp, design, n_strata):
+    e = st.stehman([design[p]["stratum"] for p in used], ref, mp, n_strata, classes=list(rl.LABELS))
+    ci = lambda v, s: {"estimate": float(v), "ci95_low": float(v - st.Z95 * s), "ci95_high": float(v + st.Z95 * s)}
+    return e, {
+        "overall_accuracy": ci(e["oa"], e["se_oa"]),
+        "users_accuracy": {c: ci(u, s) for c, u, s in zip(rl.LABELS, e["ua"], e["se_ua"])},
+        "producers_accuracy": {c: ci(u, s) for c, u, s in zip(rl.LABELS, e["pa"], e["se_pa"])},
+    }
+
+
 def assess_region(name):
     design = {r["point_id"]: r for r in read_csv(OUT_DIR / f"heldout_{name}_sample_design.csv")}
     labels = {r["point_id"]: r for r in read_csv(OUT_DIR / f"heldout_{name}_sample.csv")}
@@ -89,25 +99,25 @@ def assess_region(name):
     adjudication = OUT_DIR / f"heldout_{name}_adjudication.csv"
     if adjudication.exists():
         for a in read_csv(adjudication):
-            labels[a["point_id"]]["label_2023"] = a["adjudicated_label"]
+            for f in rl.DATE_FIELDS:
+                if a.get(f, "").strip():
+                    labels[a["point_id"]][f"{f}_2023"] = a[f]
 
-    used = [pid for pid in design if labels[pid]["label_2023"].strip() and mapped[pid]["map_2023"]]
+    refs = {pid: rl.parse(labels[pid], "2023") for pid in design}
+    used = [pid for pid in design if refs[pid] and mapped[pid]["map_2023"]]
     n_strata = {d["stratum"]: int(d["N_h"]) for d in design.values()}
-    ref = [labels[p]["label_2023"].strip() for p in used]
     mp = [mapped[p]["map_2023"] for p in used]
-    e = st.stehman([design[p]["stratum"] for p in used], ref, mp, n_strata, classes=list(LABELS))
-    gate = st.vm0007_gate(ref, mp, e["oa"], LABELS)
-    ci = lambda v, s: {"estimate": float(v), "ci95_low": float(v - st.Z95 * s), "ci95_high": float(v + st.Z95 * s)}
+    ref = [refs[p]["label"] for p in used]
+    e, cdm = accuracy(used, ref, mp, design, n_strata)
     result = {
         "n_points": len(design), "n_used": len(used),
-        "n_uninterpretable": sum(not labels[p]["label_2023"].strip() for p in design),
+        "n_uninterpretable": sum(refs[p] is None for p in design),
         "n_unclassified_by_map": sum(not mapped[p]["map_2023"] for p in design),
-        "overall_accuracy": ci(e["oa"], e["se_oa"]),
-        "users_accuracy": {c: ci(u, s) for c, u, s in zip(LABELS, e["ua"], e["se_ua"])},
-        "producers_accuracy": {c: ci(u, s) for c, u, s in zip(LABELS, e["pa"], e["se_pa"])},
-        "meets_90": bool(e["oa"] >= st.VM0007_MIN_OA), "vm0007_gate": gate,
+        **cdm, "meets_90": bool(e["oa"] >= st.VM0007_MIN_OA), "vm0007_gate": st.vm0007_gate(ref, mp, e["oa"], rl.LABELS),
+        "frel_secondary": accuracy(used, [rl.frel_label(refs[p]) for p in used], mp, design, n_strata)[1],
     }
-    print(f"{name}: OA={e['oa']:.3f} ± {st.Z95 * e['se_oa']:.3f} (n={len(used)}), meets 90%: {result['meets_90']}")
+    print(f"{name}: OA={e['oa']:.3f} ± {st.Z95 * e['se_oa']:.3f} (n={len(used)}), meets 90%: {result['meets_90']}, "
+          f"FREL OA={result['frel_secondary']['overall_accuracy']['estimate']:.3f}")
     return result
 
 

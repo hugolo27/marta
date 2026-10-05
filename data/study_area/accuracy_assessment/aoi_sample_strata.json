@@ -1,0 +1,30 @@
+{
+  "seed": 42,
+  "allocation": {
+    "loss": 50,
+    "gain": 40,
+    "discarded_change": 40,
+    "buffer": 30,
+    "stable_forest": 120,
+    "stable_nonforest": 60
+  },
+  "stratum_px": {
+    "loss": 8189,
+    "gain": 18770,
+    "discarded_change": 196884,
+    "buffer": 5860,
+    "stable_forest": 1640382,
+    "stable_nonforest": 177933
+  },
+  "valid_px": 2048018,
+  "map_change_px": {
+    "stable_forest": 1738312,
+    "stable_nonforest": 282747,
+    "loss": 8189,
+    "gain": 18770
+  },
+  "excluded_edge_px": 13431,
+  "buffer_60m_share": 0.0028613029768293054,
+  "buffer_90m_share_for_reference": 0.006012642467009568,
+  "reference_loss_px": 690
+}

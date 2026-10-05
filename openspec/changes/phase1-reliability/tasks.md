@@ -1,7 +1,7 @@
 ## 1. Pre-registration and prerequisites
 
 - [ ] 1.1 Confirm with the tutor that this change belongs in the thesis scope (complementary to `phase1-accuracy-assessment`, no change to the operational CNN), and record it in `research_docs/BITACORA.md`
-- [ ] 1.2 Write in `data/study_area/reliability/README.md`, before any scoring or sampling: the forest/non-forest crosswalk for each independent map (design D1), the ensemble comparison criterion and weight grid (D3), the AOA threshold rule (D4) and the landscape bins (D5). Verified by its SHA-256 logged to an MLflow `preregistration` run that precedes the first scoring run, as in `phase1-change-detection-hardening`
+- [ ] 1.2 Write in `data/study_area/reliability/README.md`, before any scoring or sampling: the forest/non-forest crosswalk for each independent map (design D1), the ensemble comparison criterion and weight grid (D3), the consensus trigger and criterion (D2b), the AOA threshold rule (D4) and the landscape bins (D5). Verified by its SHA-256 logged to an MLflow `preregistration` run that precedes the first scoring run, as in `phase1-change-detection-hardening`
 
 ## 2. Independent disagreement zone and hard-case sample
 
@@ -11,9 +11,9 @@
 
 ## 3. Training-label audit
 
-- [ ] 3.1 Select training patches whose MapBiomas label disagrees with at least two of the three other maps and draw ~100 stratified by class (fixed seed), verified by the set size and per-class counts
-- [ ] 3.2 Interpret the central 30 m block of each drawn patch for its own period, blind to its MapBiomas label, verified by completeness
-- [ ] 3.3 Report the label-noise rate per class and the lower bound for the training split, verified by the numbers written to the README with intervals
+- [ ] 3.1 Build the agreement and disagreement strata over the training split and draw ~100 patches (~60 / ~40, stratified by class, fixed seed), verified by stratum sizes, per-class counts and inclusion probabilities
+- [ ] 3.2 Interpret the central 30 m block of each drawn patch for its own period, blind to its MapBiomas label, typing each disagreement (label error, definition difference, mixed pixel), verified by completeness
+- [ ] 3.3 Report the label-noise rate per class for the training split with intervals, and record whether the consensus trigger (design D2b) fires, verified by the numbers and the trigger outcome written to the README
 
 ## 4. CNN + RF combination and disagreement
 

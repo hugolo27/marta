@@ -19,15 +19,23 @@ The system SHALL draw a stratified random sample of assessment points whose refe
 - **WHEN** no high-resolution imagery within the same year exists for a point, or it is cloud-covered
 - **THEN** the point-date is recorded as uninterpretable with the reason, excluded from the estimates, and the count of such exclusions per stratum is reported rather than silently dropped or labeled by guess
 
-### Requirement: Reference labels follow the Paraguayan forest definition
-The system SHALL label each point-date as forest or non-forest according to Paraguay's CDM forest definition: minimum 25% tree crown cover, minimum 0.5 ha, and potential to reach 5 m height.
+### Requirement: Reference labels follow a primary and a secondary forest definition
+The system SHALL label each point-date as forest or non-forest according to the forest definition of the case-study PD (Paraguay's CDM definition: minimum 25% tree crown cover, minimum 0.5 ha, potential to reach 5 m), fixed as primary before interpretation. It SHALL also record crown class, woody patch size, height class (or indeterminate), narrow-strip status and a near-threshold flag, and SHALL derive from them a secondary label under Paraguay's FREL definition for the Región Occidental, without a second interpretation.
 
 #### Scenario: Open or sparse woody vegetation
-- **WHEN** a point falls on woody vegetation whose crown cover is judged below 25% or whose patch is smaller than 0.5 ha
-- **THEN** the point is labeled non-forest and flagged, so the share of classifier "bosque" predictions that fail the definition can be reported separately
+- **WHEN** a point falls on woody vegetation that fails the primary definition
+- **THEN** the point is labeled non-forest under the primary definition, and the share of classifier "bosque" predictions on such vegetation is reported separately
+
+#### Scenario: Primary label contradicts its attributes
+- **WHEN** a recorded primary label is inconsistent with the recorded crown, patch or height
+- **THEN** the assessment refuses to run until the record is corrected
+
+#### Scenario: Height cannot be judged
+- **WHEN** the interpreter records height as indeterminate
+- **THEN** the secondary result is reported both counting and not counting that point-date as meeting the height threshold
 
 ### Requirement: Per-date forest/non-forest accuracy against the VM0007 gate
-The system SHALL assess each date's AOI map (2019, 2023), collapsed to forest and non-forest, against the reference labels. It SHALL report the error matrix, overall accuracy, and user's and producer's accuracy per class with 95% confidence intervals. It SHALL report pass or fail against the VM0007 requirement: at least 50 interpreted points per class and overall accuracy of at least 90%.
+The system SHALL assess each date's AOI map (2019, 2023), collapsed to forest and non-forest, against the reference labels. It SHALL report the error matrix, overall accuracy, and user's and producer's accuracy per class with 95% confidence intervals. It SHALL report pass or fail against the VM0007 requirement: at least 50 interpreted points per class and overall accuracy of at least 90%, using the area-weighted overall accuracy, and SHALL report the unweighted proportion of correct points next to it.
 
 #### Scenario: Gate passed
 - **WHEN** both dates have at least 50 interpreted points per class and overall accuracy of at least 90%
@@ -41,12 +49,16 @@ The system SHALL assess each date's AOI map (2019, 2023), collapsed to forest an
 The system SHALL estimate, from the reference sample, the area of forest loss, forest gain, stable forest and stable non-forest over the AOI using a stratified estimator of area and accuracy. It SHALL report the error-adjusted area with a 95% confidence interval alongside the mapped (pixel-count) area.
 
 #### Scenario: Area estimates produced
-- **WHEN** the change-stratified reference sample has been interpreted
-- **THEN** the system reports, per change category, the mapped area, the error-adjusted area, its 95% confidence interval, and the user's and producer's accuracy of that category
+- **WHEN** the reference sample has been interpreted
+- **THEN** the system reports, per change category, the mapped area, the error-adjusted area, its 95% confidence interval, and the user's and producer's accuracy of that category, with the user's and producer's accuracy of forest loss as the headline result
 
 #### Scenario: Omitted change inside a large stable stratum
 - **WHEN** reference points in a stable stratum show real change that the map missed
 - **THEN** that omission contributes to the error-adjusted area of the change category, rather than only commission errors inside the mapped change strata being counted
+
+#### Scenario: No reference loss found in a stratum
+- **WHEN** none of a stratum's interpreted points shows loss
+- **THEN** the system reports a rule-of-three upper bound for that stratum and a loss upper bound that includes it, rather than a confidence interval narrowed by a zero variance
 
 #### Scenario: Mapped change stratum is empty
 - **WHEN** the selected change map contains no pixels of a change category
@@ -67,15 +79,19 @@ The system SHALL assess 2023 forest/non-forest accuracy against interpreted refe
 - **THEN** the system reports that region's error matrix, overall accuracy and per-class accuracies with confidence intervals next to the AOI's, and states whether that region meets the 90% bar
 
 ### Requirement: Reference data consistency is measured
-The system SHALL re-interpret a random 10% subset of the reference points blind to the first interpretation, and SHALL report the agreement rate. It SHALL adjudicate disagreements before the final estimates are computed.
+The system SHALL re-interpret a random 20% subset of the reference points blind to the first interpretation, and SHALL report the agreement rate. It SHALL adjudicate disagreements before the final estimates are computed.
 
 #### Scenario: Consistency reported
 - **WHEN** the repeat interpretation of the subset is complete
 - **THEN** the system reports the agreement rate, lists the disagreeing points with the adjudicated label, and computes final estimates from adjudicated labels only
 
 ### Requirement: Assessment sample is not reused for tuning
-The system SHALL NOT use the reference sample to tune, retrain, or select models, thresholds, or post-processing. If any such change is made after the assessment, the system SHALL re-assess on a newly drawn reference sample before reporting accuracy for the changed model.
+The system SHALL NOT use the reference sample or its results to tune, retrain, or select models, thresholds, or post-processing. The reference labels MAY evaluate a later model version only if the decision to make that change was taken without using this assessment's results; otherwise the system SHALL re-assess on a newly drawn reference sample before reporting accuracy for the changed model.
 
-#### Scenario: Classifier changed after assessment
+#### Scenario: Classifier changed in response to the assessment
 - **WHEN** a model, threshold, or post-processing step is changed in response to this assessment's results
 - **THEN** the previously reported accuracy is marked as applying to the previous version only, and a new sample is drawn and interpreted before accuracy is reported for the new version
+
+#### Scenario: Classifier changed on independent evidence
+- **WHEN** a model change was decided by a criterion that did not use this assessment's results
+- **THEN** the existing reference labels may evaluate the new version with the stored strata and the Stehman estimator, and the report states how the change was decided
