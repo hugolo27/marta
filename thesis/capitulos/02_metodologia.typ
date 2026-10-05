@@ -64,3 +64,37 @@ Estos valores se fijaron una sola vez, citando rango estándar de literatura, y 
 ajustaron empíricamente durante el desarrollo. Una barrida de sensibilidad de un
 parámetro a la vez (diseñada junto con el resto de esta metodología) verifica esta
 elección contra el propio dataset -- resultado en la sección de resultados de Fase 1.
+
+== Detección de cambio y evaluación de exactitud
+
+*Cambio bosque/no bosque con post-proceso pre-registrado.* El primer mapa de cambio del AOI
+reportaba 1.007 ha de pérdida de bosque; Hansen Global Forest Change registra 0,1 ha en
+2020-2023 y MapBiomas no coincide con ninguno de esos píxeles, así que era casi todo error
+de comisión. El producto principal pasó a ser el cambio bosque/no bosque, y el post-proceso
+se eligió con una regla escrita y registrada en MLflow antes de puntuar: entre 12
+configuraciones, la que menos pérdida falsa deja en el AOI sin perder más de la mitad de la
+pérdida confirmada en un área de desarrollo con deforestación real. Quedó elegida confianza
+≥ 0,7 en ambas fechas más persistencia en 2022: pérdida mapeada de 81,9 ha.
+
+*Evaluación contra referencia independiente.* La exactitud medida hasta ahí es acuerdo con
+otros mapas, no con el terreno. El test final usa la vara que el propio proyecto del caso
+de estudio fija para su monitoreo (VM0007): puntos interpretados sobre imagen de alta
+resolución, al menos 50 por clase, exactitud general ≥ 90 %. El diseño, fijado antes de
+interpretar:
+
+- *Muestra estratificada de 340 puntos* en seis estratos: pérdida y ganancia mapeadas, el
+  cambio que el post-proceso descartó, una franja de 60 m alrededor del cambio y de la
+  pérdida que marcan Hansen o MapBiomas, y bosque y no bosque estables. Los estratos extra
+  apuntan a donde puede esconderse pérdida que el mapa no vio.
+- *Estimadores de Stehman (2014) y Olofsson et al. (2014)* para la exactitud y las áreas
+  ajustadas por error con intervalo de confianza. Esas áreas, no los píxeles mapeados, son
+  las que pasan a la estimación de carbono.
+- *Dos definiciones de bosque:* la del proyecto (MDL: 25 % de copa, 0,5 ha, 5 m) como
+  principal y la del nivel de referencia nacional (FREL, Región Occidental: 10 % de copa,
+  1 ha, 3 m) como secundaria, derivada de los atributos registrados por punto sin
+  interpretar dos veces.
+- *Resultado central:* la exactitud del usuario y del productor de la clase pérdida. En un
+  área casi intacta, la exactitud general es alta casi sin importar el mapa de cambio.
+- *Consistencia del intérprete:* repetición a ciegas del 20 % de los puntos, idealmente por
+  una segunda persona, ya que el intérprete principal es el autor del modelo.
+

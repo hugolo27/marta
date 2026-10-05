@@ -130,6 +130,6 @@ documento hasta la corrida exacta que lo produjo.
 == Próximos pasos
 
 - Fase 2: estimación de carbono (altura de dosel + calibración GEDI L4A + conversión a
-  CO2e) -- no arrancada.
+  CO2e): propuesta, sin implementar.
 - Fase 3: validación contra ecuaciones alométricas o datos de campo, si hay acceso.
 - Fase 4: demo de auditoría contra Corazón Verde del Chaco.
