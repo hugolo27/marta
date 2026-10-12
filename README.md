@@ -6,7 +6,7 @@ Final Master's Project (TFM) for the Master's Degree in Artificial Intelligence 
 
 ## About the project
 
-MARTA classifies land cover (forest / pasture / clearing / crop) over Sentinel-2 imagery of the Paraguayan Chaco using a CNN, and adds interpretability (Grad-CAM) so every prediction is auditable instead of a black box. It applies to the monitoring (MRV) context of REDD+ projects in the carbon credit market.
+MARTA classifies land cover (forest / pasture / crop per date; clearing is derived by comparing two dates) over Sentinel-2 imagery of the Paraguayan Chaco using a CNN, and adds interpretability (Grad-CAM) so every prediction is auditable instead of a black box. It applies to the monitoring (MRV) context of REDD+ projects in the carbon credit market.
 
 The full framing (research question, objectives, scope and out-of-scope) is in [`docs/FOUNDATION.md`](docs/FOUNDATION.md).
 

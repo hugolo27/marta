@@ -16,7 +16,14 @@ gaps both come through as all-zero across every band -- indistinguishable, and (
 08_assemble_dataset.py's established all-zero-is-masked convention) both get marked UNCLASSIFIED
 rather than fed to the CNN as if they were real pixels.
 
-Usage: .venv/bin/python scripts/18_classify_aoi_temporal.py"""
+Also stores per-pixel softmax probabilities next to each class raster, and can run over the
+change-development area and the in-between years -- both needed by
+phase1-change-detection-hardening (confidence and persistence filters, and a second area with
+real clearing to score them on). Same checkpoint, same June-September window for every year.
+
+Usage: .venv/bin/python scripts/18_classify_aoi_temporal.py [--area aoi|dev] [--years 2019 2023]"""
+
+import argparse
 
 import json
 from pathlib import Path
@@ -37,8 +44,13 @@ train_cnn = __import__("importlib").import_module("10_train_cnn")
 REPO_ROOT = Path(__file__).resolve().parents[1]
 OUT_DIR = REPO_ROOT / "data" / "study_area"
 AOI_PATH = REPO_ROOT / "data" / "study_area" / "aoi.geojson"
+AREAS = {
+    "aoi": {"path": AOI_PATH, "prefix": "aoi"},
+    "dev": {"path": REPO_ROOT / "data" / "study_area" / "change_hardening" / "dev_area.geojson", "prefix": "dev"},
+}
 
-PERIODS = {"2019": ("2019-06-01", "2019-09-30"), "2023": ("2023-06-01", "2023-09-30")}
+PERIODS = {str(y): (f"{y}-06-01", f"{y}-09-30") for y in range(2019, 2024)}
+DEFAULT_YEARS = ["2019", "2023"]
 PATCH_RADIUS_PX = 16  # -> 33x33, matches phase1-classifier's training patches
 PIXEL_M = 10
 TILE_CORE_PX = 400  # + 2*PATCH_RADIUS_PX padding = 432x432 = 186,624 px, under GEE's 262,144 cap
@@ -53,8 +65,8 @@ to_utm = pyproj.Transformer.from_crs("EPSG:4326", UTM_CRS, always_xy=True).trans
 to_wgs84 = pyproj.Transformer.from_crs(UTM_CRS, "EPSG:4326", always_xy=True).transform
 
 
-def load_aoi_geom_wgs84():
-    gj = json.loads(AOI_PATH.read_text())
+def load_aoi_geom_wgs84(path=AOI_PATH):
+    gj = json.loads(path.read_text())
     return shape(gj["features"][0]["geometry"])
 
 
@@ -99,6 +111,7 @@ def classify_tile(grid, model, device):
     h, w, c = grid.shape
     out_h, out_w = h - 2 * PATCH_RADIUS_PX, w - 2 * PATCH_RADIUS_PX
     out = np.full((out_h, out_w), UNCLASSIFIED, dtype=np.int64)
+    out_proba = np.full((out_h, out_w, len(CLASS_NAMES)), np.nan, dtype=np.float16)
 
     model.eval()
     import torch
@@ -118,27 +131,32 @@ def classify_tile(grid, model, device):
             valid = ~np.all(centers == 0, axis=-1)  # (rows_here, out_w)
 
             preds = np.full(n_rows * out_w, UNCLASSIFIED, dtype=np.int64)
+            proba = np.full((n_rows * out_w, len(CLASS_NAMES)), np.nan, dtype=np.float16)
             valid_flat = valid.reshape(-1)
             if valid_flat.any():
                 valid_patches = flat[valid_flat]
-                batch_preds = []
+                batch_proba = []
                 for i in range(0, len(valid_patches), CNN_BATCH):
                     batch = torch.from_numpy(np.ascontiguousarray(valid_patches[i:i + CNN_BATCH])).to(device)
-                    batch_preds.append(model(batch).argmax(1).cpu().numpy())
-                preds[valid_flat] = np.concatenate(batch_preds)
+                    batch_proba.append(torch.softmax(model(batch), dim=1).cpu().numpy())
+                valid_proba = np.concatenate(batch_proba)
+                preds[valid_flat] = valid_proba.argmax(1)
+                proba[valid_flat] = valid_proba
             out[row_start:row_end] = preds.reshape(row_end - row_start, out_w)
-    return out
+            out_proba[row_start:row_end] = proba.reshape(row_end - row_start, out_w, len(CLASS_NAMES))
+    return out, out_proba
 
 
-def classify_period(period, start, end, model, device, aoi_m, tiles, n_rows, n_cols):
-    aoi_wgs84 = ee.Geometry(json.loads(AOI_PATH.read_text())["features"][0]["geometry"])
-    composite = s2_utils.build_s2_composite(aoi_wgs84, start, end, add_ndvi=True, reproject=True, clip=True)
+def classify_period(period, start, end, model, device, area_path, tiles, n_rows, n_cols):
+    area_wgs84 = ee.Geometry(json.loads(area_path.read_text())["features"][0]["geometry"])
+    composite = s2_utils.build_s2_composite(area_wgs84, start, end, add_ndvi=True, reproject=True, clip=True)
     channels = s2_utils.S2_BANDS + ["NDVI"]
 
     full = np.full((n_rows * TILE_CORE_PX, n_cols * TILE_CORE_PX), UNCLASSIFIED, dtype=np.int64)
+    full_proba = np.full((n_rows * TILE_CORE_PX, n_cols * TILE_CORE_PX, len(CLASS_NAMES)), np.nan, dtype=np.float16)
     for i, t in enumerate(tiles):
         grid = pull_tile(composite, channels, t["padded_utm"])
-        tile_out = classify_tile(grid, model, device)
+        tile_out, tile_proba = classify_tile(grid, model, device)
         # GEE's rectangle snapping can return a few more/fewer pixels than requested; cap to the
         # core tile size so adjacent tiles never overlap in the stitched output (any extra rows/
         # cols beyond TILE_CORE_PX would just duplicate the next tile's own coverage).
@@ -146,53 +164,58 @@ def classify_period(period, start, end, model, device, aoi_m, tiles, n_rows, n_c
         r0, c0 = t["row"] * TILE_CORE_PX, t["col"] * TILE_CORE_PX
         h, w = tile_out.shape
         full[r0:r0 + h, c0:c0 + w] = tile_out
+        full_proba[r0:r0 + h, c0:c0 + w] = tile_proba[:TILE_CORE_PX, :TILE_CORE_PX]
         print(f"  {period} tile {i + 1}/{len(tiles)} (row={t['row']}, col={t['col']}): "
               f"{h}x{w}, {(tile_out != UNCLASSIFIED).sum()}/{h * w} classified")
 
     n_unclassified = int((full == UNCLASSIFIED).sum())
     print(f"{period}: {full.size} px total, {n_unclassified} unclassified "
           f"({n_unclassified / full.size:.1%})")
-    return full
+    return full, full_proba
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--area", choices=list(AREAS), default="aoi")
+    parser.add_argument("--years", nargs="+", choices=list(PERIODS), default=DEFAULT_YEARS)
+    args = parser.parse_args()
+    area = AREAS[args.area]
+
     mlflow.set_experiment(EXPERIMENT_NAME)
-    with mlflow.start_run(run_name="classify_aoi_2019_2023"):
+    with mlflow.start_run(run_name=f"classify_{area['prefix']}_{'_'.join(args.years)}"):
         gee_session.init()
-        aoi_wgs84 = load_aoi_geom_wgs84()
-        aoi_m = shapely_transform(to_utm, aoi_wgs84)
-        tiles, n_rows, n_cols = build_tile_grid(aoi_m)
-        print(f"AOI tiled into {len(tiles)} blocks ({n_rows} rows x {n_cols} cols of up to "
+        area_wgs84 = load_aoi_geom_wgs84(area["path"])
+        area_m = shapely_transform(to_utm, area_wgs84)
+        tiles, n_rows, n_cols = build_tile_grid(area_m)
+        print(f"{args.area} tiled into {len(tiles)} blocks ({n_rows} rows x {n_cols} cols of up to "
               f"{TILE_CORE_PX}x{TILE_CORE_PX} px each)")
 
         model, device = train_cnn.load_checkpoint()
         print(f"Loaded checkpoint: {train_cnn.CHECKPOINT_PATH}")
         mlflow.log_params({
+            "area": args.area, "years": ",".join(args.years),
             "n_tiles": len(tiles), "n_rows": n_rows, "n_cols": n_cols,
             "tile_core_px": TILE_CORE_PX, "pixel_m": PIXEL_M, "utm_crs": UTM_CRS,
         })
 
-        rasters = {}
-        for period, (start, end) in PERIODS.items():
-            print(f"\nClassifying {period}...")
-            rasters[period] = classify_period(period, start, end, model, device, aoi_m, tiles, n_rows, n_cols)
-            unclassified_frac = float((rasters[period] == UNCLASSIFIED).mean())
-            mlflow.log_metric(f"unclassified_fraction_{period}", unclassified_frac)
-
         # The rasters themselves aren't logged as MLflow artifacts (~27MB each, already excluded
         # from git for the same reason, .gitignore) -- fully reproducible by rerunning this script
-        # against the same checkpoint, so the metrics above are what's worth tracking per run.
-        for period, raster in rasters.items():
-            out_path = OUT_DIR / f"aoi_classified_{period}.npy"
-            np.save(out_path, raster)
-            print(f"saved: {out_path}")
+        # against the same checkpoint, so the metrics are what's worth tracking per run.
+        for period in args.years:
+            start, end = PERIODS[period]
+            print(f"\nClassifying {period}...")
+            raster, proba = classify_period(period, start, end, model, device, area["path"], tiles, n_rows, n_cols)
+            mlflow.log_metric(f"unclassified_fraction_{period}", float((raster == UNCLASSIFIED).mean()))
+            for name, arr in [(f"{area['prefix']}_classified_{period}.npy", raster), (f"{area['prefix']}_proba_{period}.npy", proba)]:
+                np.save(OUT_DIR / name, arr)
+                print(f"saved: {OUT_DIR / name}")
 
         grid_meta = {
             "n_rows": n_rows, "n_cols": n_cols, "tile_core_px": TILE_CORE_PX, "pixel_m": PIXEL_M,
-            "utm_crs": UTM_CRS, "aoi_utm_bounds": list(aoi_m.bounds),
+            "utm_crs": UTM_CRS, "aoi_utm_bounds": list(area_m.bounds),
             "class_names": CLASS_NAMES, "unclassified_value": UNCLASSIFIED,
         }
-        meta_path = OUT_DIR / "aoi_classified_grid_meta.json"
+        meta_path = OUT_DIR / f"{area['prefix']}_classified_grid_meta.json"
         meta_path.write_text(json.dumps(grid_meta, indent=2))
         print(f"saved: {meta_path}")
         mlflow.log_artifact(str(meta_path))
