@@ -43,7 +43,7 @@ into CO2 tons — in a way that's auditable end to end?
 
 ## How a training example is built
 
-Sentinel-2 (10m, 13 bands) paired with MapBiomas labels (30m) — an exact 3:1 pixel ratio.
+Sentinel-2 L2A (10m, 12 bands + NDVI; B10 is not in L2A) paired with MapBiomas labels (30m), an exact 3:1 pixel ratio.
 Each training example is a 33×33 pixel patch (~330m per side), not a single 3×3 pixel —
 the CNN needs real spatial context to have anything to learn from. Three classes per
 date: forest / pasture / cropland (MapBiomas code 15 specifically = actual pasture, not
@@ -86,31 +86,39 @@ occurrence flipped the RF-vs-CNN conclusion: "RF wins clearly" → "technical ti
   Forest's by more than one combined standard deviation across the 5 runs each.
   [`scripts/11_compare_classifiers.py`](../scripts/11_compare_classifiers.py).
 
-### Hyperparameters — fixed once, never tuned
+### Hyperparameters: selected on the validation split
 
 | Model | Parameter | Value | Why |
 |---|---|---|---|
 | Random Forest | `n_estimators` | 400 | Standard range (300-500); variance reduction has diminishing returns past a few hundred trees |
 | Random Forest | `max_depth` | unlimited | Not risky in a forest — overfitting reduction comes from averaging many distinct trees, not pruning each one |
 | CNN | Architecture | 3 conv blocks (32→64→128 filters) | Small and custom, not a pretrained backbone — keeps Grad-CAM legible and the comparison against RF honest |
-| CNN | Batch size | 32 | Standard for a training set of this size (1,673 training examples in the final dataset) |
-| CNN | Learning rate | 0.001 | Default recommended in the original Adam paper (Kingma & Ba, 2014) |
-| CNN | Dropout | 0.4 | Standard range (0.3-0.5) for a small training set, where overfitting risk is real |
+| CNN | Batch size | 16 | Selected on val (below); initial value 32 |
+| CNN | Learning rate | 0.0003 | Selected on val (below); initial value 0.001, the Adam paper's default (Kingma & Ba, 2014) |
+| CNN | Dropout | 0.5 | Selected on val (below), within the standard range (0.3-0.5) |
 | CNN | Max epochs / patience | 100 / 10 | Training stops if validation loss doesn't improve for 10 epochs, instead of an arbitrary fixed epoch count |
 
-**None of these were tuned to reach the final result.** They were set once to standard
-literature values and never swept during development. What actually moved the final
-number across the project's timeline was fixing pipeline bugs and dataset-design
-decisions, not adjusting the model — see the trajectory table below.
+The initial values were set once to standard literature values. What moved the result across
+the review rounds was fixing pipeline bugs and dataset-design decisions, not the
+hyperparameters (see the trajectory table below).
 
-**Sensitivity sweep, run afterward** (one parameter at a time, `data/study_area/hyperparameter_sweep_results.json`):
-the literature-standard choice holds up empirically for 4 of 5 parameters swept (RF
-`n_estimators`/`max_depth`, CNN `dropout`/`batch_size` all matched or beat the
-alternatives tested). The exception: CNN `learning_rate` — 0.0001 scored 0.850 ± 0.007
-against 0.843 ± 0.016 for the 0.001 actually used. The gap is small and the ranges
-overlap at only 3 seeds, so it isn't confirmed as a real effect rather than noise, and
-the reference CNN checkpoint was not retrained on it without a formal 5-seed comparison
-first — flagged here as a real, honest finding, not acted on yet.
+**Selection on the validation split** ([`phase1-hyperparameter-selection`](../openspec/changes/archive/2026-10-13-phase1-hyperparameter-selection/),
+[`scripts/24_hyperparameter_selection.py`](../scripts/24_hyperparameter_selection.py),
+[`data/study_area/hyperparameter_selection/`](../data/study_area/hyperparameter_selection/)).
+Full grids: RF 18 configurations (`n_estimators` × `max_depth` × `max_features`), CNN 36
+(`lr` × `dropout` × `batch_size`), 5 seeds each, macro-F1 on val, sample standard deviation
+(`ddof=1`). Rule fixed before scoring (hash logged to MLflow): keep the initial configuration
+unless the best one beats it by more than their pooled standard deviation, the same criterion
+used for RF vs. CNN. No run hit the 100-epoch cap.
+
+- RF: best 0.832 ± 0.007 vs. initial 0.827 ± 0.003 (+0.005, pooled std 0.006). Initial kept.
+- CNN: best (`lr` 0.0003, `dropout` 0.5, `batch_size` 16) 0.844 ± 0.008 vs. initial 0.826 ±
+  0.016 (+0.018, pooled std 0.013). Adopted. Early stopping fires between epochs 24 and 39.
+
+Test was then evaluated once, with these configurations. An earlier one-at-a-time sweep (3
+seeds) had been scored on the test split
+([`hyperparameter_sweep_test_split.json`](../data/study_area/hyperparameter_sweep_test_split.json)).
+It was not used to choose anything, including the grid values, and is kept only as a record.
 
 ## What changed along the way
 
@@ -137,6 +145,7 @@ first — flagged here as a real, honest finding, not acted on yet.
 | Review round 2 | 0.775 | 0.783 | Technical tie | UTM zone bug (footprint spans zones 20S/21S; `.reproject()` was distorting points far from the forced zone) |
 | Review round 4 | 0.773 | 0.778 | Technical tie (held) | spatial buffer check made mandatory and automatic on every dataset build, not a one-off manual verification |
 | Review rounds 5-8 | 0.811 | 0.843 | **CNN wins** | second leakage found (between 2019/2023), dataset doubled to 400/class, all 3 held-out regions rerun with 5 seeds |
+| Tutor review of this PR | 0.811 | 0.860 | **CNN wins** | hyperparameters selected on val, test evaluated once, sample standard deviations |
 
 None of this was "tuning to improve the number" — each change came from asking "is this
 actually valid?", and the result sometimes got worse or flipped direction instead of
@@ -146,8 +155,9 @@ improving.
 
 ### On the AOI test split
 
-**Random Forest 0.811 F1 macro (±0.004), CNN 0.843 (±0.012)** — a +0.032 difference,
-above the pre-registered threshold. Raw numbers: [`data/study_area/comparison_results.json`](../data/study_area/comparison_results.json).
+**Random Forest 0.811 F1 macro (±0.005), CNN 0.860 (±0.008)**, a +0.049 difference,
+above the pre-registered threshold (pooled std 0.007). Configurations selected on val, test
+evaluated once; with the initial configurations the CNN also won (0.843 vs. 0.811). Raw numbers: [`data/study_area/comparison_results.json`](../data/study_area/comparison_results.json).
 This answers one question only — which model wins on the AOI's own test split — not
 which classifier the system should actually use; that needs evidence from outside the
 AOI.
@@ -160,9 +170,9 @@ it became the reported result):
 
 | Region | Landscape | RF | CNN | Result | Raw data |
 |---|---|---|---|---|---|
-| Filadelfia | Mennonite farming colony, fragmented forest | 0.829 ± 0.001 | 0.696 ± 0.021 | **RF wins, decisively** | [`filadelfia_holdout_results.json`](../data/study_area/filadelfia_holdout_results.json) |
-| Bahía Negra | Continuous, remote forest | 0.611 ± 0.002 | 0.611 ± 0.016 | **Real tie** | [`bahia_negra_holdout_results.json`](../data/study_area/bahia_negra_holdout_results.json) |
-| Pozo Colorado | Cattle ranching, Trans-Chaco highway | 0.661 ± 0.006 | 0.727 ± 0.021 | **CNN wins** | [`pozo_colorado_holdout_results.json`](../data/study_area/pozo_colorado_holdout_results.json) |
+| Filadelfia | Mennonite farming colony, fragmented forest | 0.831 ± 0.001 | 0.706 ± 0.016 | **RF wins, decisively** | [`filadelfia_holdout_results.json`](../data/study_area/filadelfia_holdout_results.json) |
+| Bahía Negra | Continuous, remote forest | 0.611 ± 0.002 | 0.619 ± 0.004 | **CNN wins**, narrowly (+0.008 vs. pooled std 0.003) | [`bahia_negra_holdout_results.json`](../data/study_area/bahia_negra_holdout_results.json) |
+| Pozo Colorado | Cattle ranching, Trans-Chaco highway | 0.661 ± 0.007 | 0.727 ± 0.017 | **CNN wins** | [`pozo_colorado_holdout_results.json`](../data/study_area/pozo_colorado_holdout_results.json) |
 
 ### Why the CNN specifically fails in Filadelfia
 
@@ -180,7 +190,7 @@ at the center pixel, has no such failure mode.
 ### Decision: CNN as the operational classifier
 
 Confirmed as the classifier that Grad-CAM, the temporal comparison, and carbon
-estimation are built on. It wins or ties in 3 of the 4 evaluated contexts (AOI, Bahía
+estimation are built on. It wins in 3 of the 4 evaluated contexts (AOI, Bahía
 Negra, Pozo Colorado) and loses only in Filadelfia, with a specific, understood cause —
 not an unexplained generalization gap. Acceptable because the actual deployment target
 (Corazón Verde del Chaco) isn't a fragmented-colony landscape like Filadelfia.
@@ -223,17 +233,24 @@ The same trained CNN checkpoint is applied to both dates — never retrained per
 avoid mixing training variance with real change.
 [`scripts/18_classify_aoi_temporal.py`](../scripts/18_classify_aoi_temporal.py) →
 [`scripts/19_temporal_change_map.py`](../scripts/19_temporal_change_map.py). Named
-transitions detected: `forest_to_pasture` (1,007 ha), `pasture_to_forest` (1,181 ha),
-`cropland_to_pasture` (242 ha), `cropland_to_forest` (50 ha). Full numbers:
+transitions detected with the current checkpoint: `forest_to_pasture` (896 ha), `cropland_to_forest`
+(626 ha), `pasture_to_forest` (491 ha), `cropland_to_pasture` (462 ha). Full numbers:
 [`data/study_area/change_stats_2019_2023.json`](../data/study_area/change_stats_2019_2023.json).
 
 **Honest finding**, from cross-checking against MapBiomas
 ([`scripts/20_mapbiomas_cross_check.py`](../scripts/20_mapbiomas_cross_check.py),
 [`data/study_area/mapbiomas_agreement.json`](../data/study_area/mapbiomas_agreement.json)):
-`no_change` agrees 99.3% of the time, but each specific transition type agrees very
-little (0-4.7%). Most detected transitions are probably classifier noise at the
+`no_change` agrees 99.7% of the time, but each specific transition type agrees very
+little (0-8.9%). Most detected transitions are probably classifier noise at the
 forest/pasture boundary, not confirmed real change — flagged plainly rather than
 presented as validated.
+
+That finding led to `phase1-change-detection-hardening` (archived): the main product is now
+forest/non-forest change, with post-processing chosen by a pre-registered rule against Hansen
+and MapBiomas. With the current checkpoint the rule selects confidence ≥ 0.9 on both dates plus
+persistence into 2022: 7.6 ha of mapped loss in the AOI, 0.5 ha of gain (mapped, not yet
+assessed). Details: [`data/study_area/change_hardening/README.md`](../data/study_area/change_hardening/README.md).
+The final test against interpreted reference points is `phase1-accuracy-assessment`, in progress.
 
 ## Grad-CAM — per-prediction interpretability
 

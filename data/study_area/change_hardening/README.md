@@ -76,7 +76,10 @@ Selected box: see "Results" below (filled by task 1.2, before scoring).
 2020-2023** (next best: 4,765 ha). Overlap with the AOI and with each held-out region: 0 ha
 (checked with `ee.Geometry.intersection().area()`). Geometry: `dev_area.geojson`.
 
-### Scores and selection (tasks 4.1-4.3, 2026-09-24)
+### Scores and selection with the initial CNN (tasks 4.1-4.3, 2026-09-24, superseded)
+
+Superseded by the re-scoring below, after `phase1-hyperparameter-selection` changed the CNN. Kept
+as a record.
 
 Pre-registration hash checked by `26_score_change_configs.py score` before scoring (unchanged).
 Full table: `scores.json`. Confirmed loss (Hansen AND MapBiomas, 30 m blocks): **AOI 0.0 ha**,
@@ -114,3 +117,41 @@ The MMU step changes almost nothing here, because at 30 m blocks isolated 10 m p
 drop out; it was not needed to meet the rule. The 80.8 ha left in the AOI are still not confirmed
 by either reference. Whether they are errors or real change missed by both is what the interpreted
 sample in `phase1-accuracy-assessment` decides.
+
+### Re-scored after `phase1-hyperparameter-selection` (2026-10-13)
+
+The CNN configuration selected on the validation split replaced the operational checkpoint
+(`openspec/changes/archive/2026-10-13-phase1-hyperparameter-selection/`, design D5). The AOI and the development area
+were reclassified for 2019-2023 with the new checkpoint and the same rule was applied again,
+unchanged (pre-registration hash checked by `26_score_change_configs.py score`). Confirmed loss is
+the same as before: AOI 0.0 ha, development area 4,855.9 ha.
+
+| Confidence | Persistence | MMU 0.5 ha | Dev retention | Dev map loss (ha) | AOI false loss (ha) |
+|---|---|---|---|---|---|
+| none | off | off | 0.985 | 6,597.4 | 899.4 |
+| none | off | on | 0.985 | 6,591.1 | 893.5 |
+| none | on | off | 0.935 | 5,845.9 | 429.1 |
+| none | on | on | 0.935 | 5,835.5 | 424.5 |
+| 0.7 | off | off | 0.975 | 6,145.0 | 301.7 |
+| 0.7 | off | on | 0.975 | 6,143.5 | 300.0 |
+| 0.7 | on | off | 0.931 | 5,604.6 | 145.1 |
+| 0.7 | on | on | 0.931 | 5,601.1 | 144.4 |
+| 0.9 | off | off | 0.911 | 5,274.1 | 18.8 |
+| 0.9 | off | on | 0.911 | 5,270.8 | 18.3 |
+| **0.9** | **on** | **off** | **0.882** | **4,969.9** | **7.1** |
+| 0.9 | on | on | 0.882 | 4,962.9 | 6.7 |
+
+Rule applied: step 1 rejects nothing (every retention ≥ 0.50; the new CNN is more confident on real
+clearing, so the confidence-0.9 configurations no longer lose half of it). Step 2: minimum AOI
+false loss is 6.7 ha, band ≤ 7.4 ha: {0.9 + persistence: 7.1, 0.9 + persistence + MMU: 6.7}.
+Step 3: fewest active steps. **Selected: confidence 0.9 + persistence, no MMU.**
+
+Selected vs. unfiltered:
+
+- AOI: false loss 899.4 → 7.1 ha (−99%); confirmed stable forest kept 95.6% → 99.96%.
+- Development area: 92.8% of map loss confirmed by Hansen (was 81.6%) and 87.1% by MapBiomas (was
+  76.2%); captures 83.6% of Hansen loss (was 97.6%) and 77.9% of MapBiomas loss (was 90.6%).
+
+Final AOI map (`change_stats_2019_2023_fnf.json`): 7.6 ha loss, 0.5 ha gain, mapped, not assessed.
+The AOI reference sample was redrawn on this map (`../accuracy_assessment/`); no point of the
+previous draw had been interpreted.
