@@ -5,7 +5,7 @@ See proposal.md for motivation. Relevant current state:
 - Operational classifier: the reference CNN checkpoint (`data/study_area/cnn_checkpoint.pt`, seed 42). Random Forest baseline on the central pixel's 12 bands + NDVI (`scripts/09_train_random_forest.py`). Fixed train/val/test split by ~2 km spatial blocks (`scripts/dataset_loader.py`).
 - Dense CNN probabilities exist for the AOI 2019-2023 (`aoi_proba_*.npy`). RF has no dense map yet.
 - `phase1-accuracy-assessment` provides interpreted forest/non-forest reference points: ~275 in the AOI (2019 and 2023, stratified by change class) and 3 × 100 in the held-out regions (2023, stratified by WorldCover tree/other). Its labels are not yet interpreted.
-- Known hygiene issue: the hyperparameter sweep scored on the test split (BITACORA 2026-09-19). Nothing here selects anything on the test split except the pre-registered ensemble comparison, which uses the same split and criterion style as the original CNN vs. RF decision.
+- Hyperparameters are selected on the validation split (`phase1-hyperparameter-selection`, archived 2026-10-13); the earlier sweep on the test split was not used for any decision. Nothing here selects anything on the test split except the pre-registered ensemble comparison, which uses the same split and criterion style as the original CNN vs. RF decision.
 
 ## Goals / Non-Goals
 
