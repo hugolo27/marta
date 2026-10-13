@@ -49,11 +49,11 @@ def _summarize(runs):
     accs = np.array([r["report"]["accuracy"] for r in runs])
     ious = np.stack([r["iou_per_class"] for r in runs])
     return {
-        "macro_f1_mean": float(f1s.mean()), "macro_f1_std": float(f1s.std()),
+        "macro_f1_mean": float(f1s.mean()), "macro_f1_std": float(f1s.std(ddof=1)),
         "macro_f1_runs": f1s.round(4).tolist(),
-        "accuracy_mean": float(accs.mean()), "accuracy_std": float(accs.std()),
+        "accuracy_mean": float(accs.mean()), "accuracy_std": float(accs.std(ddof=1)),
         "iou_per_class_mean": dict(zip(dl.CLASS_NAMES, ious.mean(axis=0).round(4).tolist())),
-        "iou_per_class_std": dict(zip(dl.CLASS_NAMES, ious.std(axis=0).round(4).tolist())),
+        "iou_per_class_std": dict(zip(dl.CLASS_NAMES, ious.std(axis=0, ddof=1).round(4).tolist())),
     }
 
 

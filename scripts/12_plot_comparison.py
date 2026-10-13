@@ -24,7 +24,7 @@ def main():
         (0, results["rf_scores"], COLOR_RF, "Random Forest"),
         (1, results["cnn_scores"], COLOR_CNN, "CNN"),
     ]:
-        mean, std = np.mean(scores), np.std(scores)
+        mean, std = np.mean(scores), np.std(scores, ddof=1)
         all_scores.extend(scores)
         ax.bar(x, mean, yerr=std, width=0.5, color=color, capsize=6,
                error_kw={"elinewidth": 1.5, "ecolor": "#3a3a38"})

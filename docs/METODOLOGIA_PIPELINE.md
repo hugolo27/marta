@@ -84,7 +84,7 @@ dato, cómo se procesa y para qué se usa el resultado.
 
 | Fuente | Qué es | Cobertura temporal/espacial | Por qué esta fuente y no una alternativa |
 |---|---|---|---|
-| **Sentinel-2 L2A** (Copernicus/ESA) | Imágenes multiespectrales, 13 bandas, 10 m de resolución nativa, revisita nominal de 5 días | Global; en este proyecto, usable de forma densa desde 2019 sobre el área de trabajo (chequeo empírico: 14 escenas en 2018 contra 73 en 2019 sobre el mismo polígono) | Resolución más fina que Landsat (30 m) y acceso a bandas red-edge/SWIR que un RGB simple no tiene. Se usa L2A (reflectancia de superficie) y no L1C (tope de atmósfera, sin corregir) por tres razones concretas: (1) la comparación temporal 2019 vs. 2023 necesita que los valores de reflectancia sean comparables entre fechas — con L1C, condiciones atmosféricas distintas en cada fecha meterían diferencias que no son cambio real de cobertura; (2) NDVI y otros índices espectrales solo son físicamente válidos sobre reflectancia de superficie, no sobre valores distorsionados por dispersión atmosférica; (3) MapBiomas (la etiqueta) ya sale de reflectancia de superficie de Landsat corregida — usar L2A mantiene la misma magnitud física de ambos lados del par imagen-etiqueta |
+| **Sentinel-2 L2A** (Copernicus/ESA) | Imágenes multiespectrales, 12 bandas en L2A (B10 solo existe en L1C) más NDVI calculado, 10 m de resolución nativa, revisita nominal de 5 días | Global; en este proyecto, usable de forma densa desde 2019 sobre el área de trabajo (chequeo empírico: 14 escenas en 2018 contra 73 en 2019 sobre el mismo polígono) | Resolución más fina que Landsat (30 m) y acceso a bandas red-edge/SWIR que un RGB simple no tiene. Se usa L2A (reflectancia de superficie) y no L1C (tope de atmósfera, sin corregir) por tres razones concretas: (1) la comparación temporal 2019 vs. 2023 necesita que los valores de reflectancia sean comparables entre fechas: con L1C, condiciones atmosféricas distintas en cada fecha meterían diferencias que no son cambio real de cobertura; (2) NDVI y otros índices espectrales solo son físicamente válidos sobre reflectancia de superficie, no sobre valores distorsionados por dispersión atmosférica; (3) MapBiomas (la etiqueta) ya sale de reflectancia de superficie de Landsat corregida, y usar L2A mantiene la misma magnitud física de ambos lados del par imagen-etiqueta |
 | **MapBiomas Chaco, Colección 5** | Clasificación de cobertura de suelo, un raster por año (1985-2023, 39 capas), 30 m, derivado de Landsat | Gran Chaco americano; en este proyecto, recortado a Paraguay | Es el único producto abierto con clasificación anual a escala de bioma y con suficiente profundidad histórica para modelar tendencia. Además evita tener que digitalizar el ground truth a mano, algo inviable en el volumen que pide entrenar un clasificador |
 | **ESA WorldCover v200** | Cobertura de suelo global, 10 m, año de referencia 2021 | Global | Su resolución nativa coincide con la de Sentinel-2, a diferencia de MapBiomas (30 m). Se usa solo como verificación independiente sobre un área que nunca entra en entrenamiento; mezclarlo con las etiquetas de entrenamiento sería circular |
 | **ETH Global Canopy Height** (Lang, Jetz, Schindler y Wegner, 2023, *Nature Ecology & Evolution*) | Modelo pre-entrenado que infiere altura de dosel a partir de Sentinel-2, con capa de incertidumbre propia, año base 2020 | Global | Se prefirió sobre la alternativa Potapov/GLAD (UMD) porque entrega altura e incertidumbre en bruto y deja la calibración a biomasa como un paso propio, auditable, en vez de heredar una calibración ya resuelta por terceros |
@@ -179,11 +179,37 @@ criterio → no hace falta sumar Sentinel-1 SAR para cubrir huecos.
 | Random Forest | Profundidad máxima | Sin límite | La reducción de varianza de un bosque aleatorio viene de promediar muchos árboles individualmente sobreajustados, no de limitar la profundidad de cada uno |
 | Random Forest | Variables de entrada | 12 bandas + NDVI del píxel central del parche | No se usa la ventana espacial completa: el modelo no puede aprovechar el contexto espacial que sí usa la CNN, así que dársela no aportaría una comparación más justa, solo mayor dimensionalidad |
 | CNN | Arquitectura | 3 bloques convolucionales (32/64/128 filtros) + pooling global + dropout | Deliberadamente pequeña, no un modelo pre-entrenado grande: mantiene legible una eventual capa de interpretabilidad y no oscurece la comparación contra el baseline |
-| CNN | Tamaño de lote | 32 | Valor estándar para un conjunto de entrenamiento de este orden (~840 ejemplos) |
-| CNN | Tasa de aprendizaje | 0,001 | Valor por defecto recomendado en la publicación original del optimizador Adam (Kingma y Ba, 2014) |
+| CNN | Tamaño de lote | 16 | Elegido en validación (ver abajo); el valor inicial era 32, estándar para un conjunto de este orden |
+| CNN | Tasa de aprendizaje | 0,0003 | Elegida en validación (ver abajo); el valor inicial era 0,001, el recomendado en la publicación original de Adam (Kingma y Ba, 2014) |
 | CNN | Épocas máximas / paciencia | 100 / 10 | El entrenamiento se corta si la pérdida de validación deja de mejorar durante 10 épocas seguidas, en vez de fijar a priori un número de épocas arbitrario |
-| CNN | Dropout | 0,4 | Rango estándar (0,3-0,5) para un conjunto de entrenamiento acotado (~280 ejemplos por clase), donde el riesgo de sobreajuste es real |
+| CNN | Dropout | 0,5 | Elegido en validación (ver abajo), dentro del rango estándar (0,3-0,5) para un conjunto de entrenamiento acotado |
 | CNN | Aumentado de datos | Rotaciones de 90°/180°/270° y espejado | Válido para imágenes satelitales vistas cenitalmente. No se aplica aumentado de color o brillo: los valores de reflectancia de Sentinel-2 tienen significado físico, y distorsionarlos podría dañar la señal en lugar de mejorar la generalización |
+
+Los valores iniciales se fijaron una vez con rangos estándar de literatura. Lo que cambió el
+resultado de la sección 5 en las rondas de revisión fueron bugs de pipeline (semilla de aumentado,
+distorsión de zona UTM, fuga espacial) y decisiones de diseño de datos (volumen de entrenamiento,
+unificación de splits entre períodos), no los hiperparámetros.
+
+**Selección de hiperparámetros en validación** (`phase1-hyperparameter-selection`,
+`scripts/24_hyperparameter_selection.py`, `data/study_area/hyperparameter_selection/`). Grilla
+completa para cada modelo: RF con `n_estimators` {300, 400, 500} × `max_depth` {sin límite, 10,
+20} × `max_features` {"sqrt", 0,5} (18 configuraciones); CNN con `lr` {0,0001, 0,0003, 0,001, 0,01}
+× `dropout` {0,3, 0,4, 0,5} × `batch_size` {16, 32, 64} (36). Cada configuración con las mismas 5
+semillas de la comparación principal, F1 macro en el split de validación, desvío muestral
+(`ddof=1`). Regla fijada antes de puntuar (hash en MLflow): la configuración inicial se mantiene
+salvo que la mejor la supere por más de la desviación estándar combinada de ambas, el mismo
+criterio que decide RF contra CNN. Ninguna corrida llegó al tope de 100 épocas.
+
+- **RF**: la mejor (300 árboles, profundidad 10, `max_features` 0,5) da 0,832 ± 0,007 contra 0,827
+  ± 0,003 de la inicial; +0,005 frente a una desviación combinada de 0,006. Se mantiene la inicial.
+- **CNN**: la mejor (`lr` 0,0003, `dropout` 0,5, `batch_size` 16) da 0,844 ± 0,008 contra 0,826 ±
+  0,016 de la inicial; +0,018 frente a 0,013. Se adopta. Su early stopping corta entre las épocas
+  24 y 39.
+
+El test se evaluó una sola vez, con estas configuraciones (sección 5.1). Una barrida anterior, un
+parámetro a la vez y con 3 semillas, se había evaluado sobre el split de test
+(`data/study_area/hyperparameter_sweep_test_split.json`). No se usó para elegir nada, tampoco los
+valores de la grilla, y queda solo como registro.
 
 El criterio de comparación entre modelos se fija antes de observar resultados: ambos se entrenan y
 evalúan en 5 corridas con distinta semilla aleatoria (que afecta la inicialización y el muestreo
@@ -237,8 +263,8 @@ WorldCover.
 ## 5. Resultados: clasificación de cobertura, CNN contra Random Forest
 
 **Resumen**: la CNN gana la comparación de precisión sobre el conjunto de prueba del área de
-estudio (AOI); evaluada contra 3 sub-áreas geográficamente independientes, gana o empata en 2 de
-las 3 y pierde claramente en la tercera (Filadelfia), por una razón identificada y específica de
+estudio (AOI); evaluada contra 3 sub-áreas geográficamente independientes, gana en 2 de las 3 y
+pierde claramente en la tercera (Filadelfia), por una razón identificada y específica de
 paisaje, no una falla de generalización sin explicar. **La CNN queda confirmada como clasificador
 operativo del sistema** (decisión cerrada el 2026-09-13, `phase1-classifier` tarea 4.4), con esa
 limitación documentada explícitamente, no escondida.
@@ -251,11 +277,13 @@ clase/período, sin fuga espacial verificada):
 
 | Modelo | F1 macro promedio | Desviación estándar |
 |---|---|---|
-| Random Forest | 0,811 | 0,004 |
-| CNN | 0,843 | 0,012 |
+| Random Forest | 0,811 | 0,005 |
+| CNN | 0,860 | 0,008 |
 
-La diferencia (+0,032 a favor de la CNN) supera el umbral de una desviación estándar combinada
-(0,009) fijado antes de correr el experimento. Por el criterio pre-registrado, **la CNN gana esta
+La diferencia (+0,049 a favor de la CNN) supera el umbral de una desviación estándar combinada
+(0,007, desvío muestral) fijado antes de correr el experimento. Son las configuraciones elegidas en
+validación (sección 3.1), evaluadas en test una sola vez; con las iniciales la CNN también ganaba
+(0,843 contra 0,811). Por el criterio pre-registrado, **la CNN gana esta
 comparación**, y lo hizo de forma consistente en 3 volúmenes/huellas de datos distintos probados
 durante el desarrollo (ver la nota de trazabilidad al final de esta sección). Ambos modelos
 muestran el mismo patrón de error: la confusión entre pasto y cultivo es sistemáticamente mayor
@@ -270,14 +298,15 @@ corridas de re-entrenamiento para tener una estimación real de varianza (no sol
 
 | Región | Perfil de paisaje | RF (media ± desvío) | CNN (media ± desvío) | Resultado |
 |---|---|---|---|---|
-| Filadelfia (Boquerón) | Colonia agrícola menonita, bosque fragmentado | 0,829 ± 0,001 | 0,696 ± 0,021 | **RF gana, decisivo** (gana en las 5 semillas) |
-| Bahía Negra (Alto Paraguay) | Bosque continuo, remoto | 0,611 ± 0,002 | 0,611 ± 0,016 | **Empate real** |
-| Pozo Colorado (Presidente Hayes) | Ganadería, ruta Trans-Chaco | 0,661 ± 0,006 | 0,727 ± 0,021 | **CNN gana**, confirmado |
+| Filadelfia (Boquerón) | Colonia agrícola menonita, bosque fragmentado | 0,831 ± 0,001 | 0,706 ± 0,016 | **RF gana, decisivo** (gana en las 5 semillas) |
+| Bahía Negra (Alto Paraguay) | Bosque continuo, remoto | 0,611 ± 0,002 | 0,619 ± 0,004 | **CNN gana**, por margen chico (+0,008 contra 0,003) |
+| Pozo Colorado (Presidente Hayes) | Ganadería, ruta Trans-Chaco | 0,661 ± 0,007 | 0,727 ± 0,017 | **CNN gana**, confirmado |
 
 **Nota metodológica, vale la pena dejarla explícita**: la primera corrida de estas 3 regiones (una
 sola semilla cada una) sugería "RF gana en 2 de 3" — con las 5 semillas, ese resultado en Bahía
-Negra resultó ser ruido de una corrida particular que agarró a la CNN en su peor semilla; el
-resultado real es un empate. Sin esa segunda pasada con varianza real, la conclusión habría
+Negra resultó ser ruido de una corrida particular que agarró a la CNN en su peor semilla; con la
+configuración inicial el resultado era un empate, y con la elegida en validación la CNN gana por
+poco. Sin esa segunda pasada con varianza real, la conclusión habría
 quedado mal reportada.
 
 ### 5.3 Por qué falla la CNN específicamente en Filadelfia
@@ -296,7 +325,7 @@ fragmentado en tiras; Random Forest, al mirar solo el píxel central, no tiene e
 ### 5.4 Decisión: clasificador operativo
 
 **La CNN queda confirmada como clasificador operativo del sistema** (Grad-CAM, comparación temporal,
-estimación de carbono se construyen sobre ella) — gana o empata en 3 de los 4 contextos evaluados
+estimación de carbono se construyen sobre ella): gana en 3 de los 4 contextos evaluados
 (AOI, Bahía Negra, Pozo Colorado) y pierde solo en Filadelfia, con una causa específica y
 entendida. Se considera aceptable porque el destino real de despliegue (el AOI de Corazón Verde
 del Chaco, Fase 4) está dentro de la huella de entrenamiento y no es un paisaje de colonia
@@ -393,12 +422,15 @@ metodológico válido, no una falla del diseño.
   principal a cambio bosque/no-bosque y eligió el post-proceso con una regla pre-registrada
   (hash registrado en MLflow antes de puntuar), evaluando 12 configuraciones contra Hansen y
   MapBiomas en el AOI y en un área de desarrollo con deforestación real documentada (Alto
-  Paraguay, 4.856 ha de pérdida confirmada por ambas fuentes). Elegida: **confianza ≥ 0,7 en ambas
-  fechas + persistencia** (la pérdida tiene que estar ya en 2022). Resultado: pérdida falsa en el
-  AOI de 999,6 a 80,8 ha (−92 %, bloques de 30 m) y retención del 90,7 % de la pérdida confirmada
-  en el área de desarrollo. Las configuraciones con confianza ≥ 0,9 borraban toda la pérdida del
-  AOI pero perdían más de la mitad de la deforestación real y la regla las rechazó. Mapa final del
-  AOI: pérdida 81,9 ha, ganancia 187,7 ha (áreas mapeadas, no evaluadas). Detalle y tabla completa:
+  Paraguay, 4.856 ha de pérdida confirmada por ambas fuentes). Con la CNN inicial quedó elegida
+  confianza ≥ 0,7 en ambas fechas + persistencia (la pérdida tiene que estar ya en 2022): pérdida
+  falsa en el AOI de 999,6 a 80,8 ha y mapa final de 81,9 ha de pérdida. Tras la selección de
+  hiperparámetros en validación (sección 3.1) la CNN cambió, y la misma regla, sin modificar, se
+  volvió a aplicar sobre las probabilidades nuevas: la CNN nueva es más segura en el área de
+  desarrollo, así que esta vez pasan la regla las configuraciones con confianza ≥ 0,9. Elegida:
+  **confianza ≥ 0,9 en ambas fechas + persistencia**. Pérdida falsa en el AOI de 899,4 a 7,1 ha
+  (bloques de 30 m) y retención del 88,3 % de la pérdida confirmada en el área de desarrollo. Mapa
+  final del AOI: pérdida 7,6 ha, ganancia 0,5 ha (áreas mapeadas, no evaluadas). Detalle y tabla completa:
   `data/study_area/change_hardening/README.md` y `scores.json`. Queda
   `phase1-accuracy-assessment` (test contra puntos interpretados con la vara VM0007, áreas
   ajustadas por error): la Fase 2 consume esas áreas ajustadas, no las mapeadas.

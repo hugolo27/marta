@@ -4,23 +4,27 @@
     "ha": 12985.5
   },
   "no_change": {
-    "pixels": 1813413,
-    "ha": 18134.1
+    "pixels": 1813350,
+    "ha": 18133.5
   },
   "bosque_a_pasto": {
-    "pixels": 100737,
-    "ha": 1007.4
+    "pixels": 89637,
+    "ha": 896.4
+  },
+  "bosque_a_cultivo": {
+    "pixels": 593,
+    "ha": 5.9
   },
   "pasto_a_bosque": {
-    "pixels": 118074,
-    "ha": 1180.7
+    "pixels": 49143,
+    "ha": 491.4
   },
   "cultivo_a_bosque": {
-    "pixels": 5032,
-    "ha": 50.3
+    "pixels": 62563,
+    "ha": 625.6
   },
   "cultivo_a_pasto": {
-    "pixels": 24193,
-    "ha": 241.9
+    "pixels": 46163,
+    "ha": 461.6
   }
 }
