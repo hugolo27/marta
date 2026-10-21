@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Etiquetado de referencia</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root { --bg: #f6f6f4; --panel: #fff; --text: #1d1d1b; --muted: #6b6b66; --line: #ddd; --accent: #1f6f4a; --warn: #a3470a; --err: #b3261e; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.4 system-ui, sans-serif; background: var(--bg); color: var(--text); }
+  header { display: flex; gap: 12px; align-items: center; padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  header b { font-size: 16px; }
+  header .muted { color: var(--muted); }
+  button { font: inherit; padding: 5px 10px; border: 1px solid var(--line); background: var(--panel); border-radius: 6px; cursor: pointer; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  main { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 12px; padding: 12px 16px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+  .map { height: 52vh; border-radius: 6px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+  .row label.opt { border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; cursor: pointer; }
+  .row input[type=radio] { display: none; }
+  .row input[type=radio]:checked + span { font-weight: 600; color: var(--accent); }
+  .k { width: 120px; color: var(--muted); }
+  select, input[type=text], input[type=number] { font: inherit; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; }
+  .verdict { font-weight: 600; }
+  .warn { color: var(--warn); }
+  .err { color: var(--err); white-space: pre-wrap; }
+  footer { padding: 0 16px 16px; display: grid; gap: 8px; }
+  footer input { width: 100%; }
+  @media (max-width: 800px) { main { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <b id="pid">...</b>
+  <span class="muted" id="progress"></span>
+  <button id="prev">Anterior</button>
+  <button id="next">Siguiente</button>
+  <button id="nextEmpty">Siguiente sin etiquetar</button>
+  <a id="gearth" target="_blank" rel="noopener">Abrir en Google Earth</a>
+  <span class="muted">Cuadrado amarillo: 0,5 ha. Cada cruz: 4 % de cobertura.</span>
+</header>
+<main id="panels"></main>
+<footer>
+  <div class="row"><span class="k">No interpretable</span><input type="text" id="reason" placeholder="Motivo, si alguna fecha queda sin etiqueta (sin imagen del año, nubes, borrosa)"></div>
+  <div class="row"><span class="k">Notas</span><input type="text" id="notes" placeholder="Borde de desmonte, cicatriz de quema, inundado..."></div>
+  <div class="row"><button class="primary" id="save">Guardar y seguir</button><span id="status"></span></div>
+</footer>
+<script>
+const FIRST_RELEASE = "2018-07-01", LAST_RELEASE = "2025-06-30";
+const CROWN = [["lt10", "<10 % (0-2 cruces)"], ["10to25", "10-25 % (3-6)"], ["ge25", "≥25 % (7+)"]];
+const PATCH = [["lt0.5", "<0,5 ha"], ["0.5to1", "0,5-1 ha"], ["ge1", "≥1 ha"]];
+const HEIGHT = [["indeterminate", "indeterminada"], ["ge5", "≥5 m"], ["3to5", "3-5 m"], ["lt3", "<3 m"]];
+let data, idx = 0, releases = [], maps = [];
+
+const $ = (id) => document.getElementById(id);
+const store = { get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+                set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
+
+async function loadReleases() {
+  const cfg = await (await fetch("https://s3-us-west-2.amazonaws.com/config.maptiles.arcgis.com/waybackconfig.json")).json();
+  releases = Object.entries(cfg).map(([id, r]) => ({ id, date: r.itemTitle.match(/\d{4}-\d{2}-\d{2}/)[0], url: r.itemURL, meta: r.metadataLayerUrl }))
+    .filter((r) => r.date >= FIRST_RELEASE && r.date <= LAST_RELEASE).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+async function captureAt(release, lon, lat) {
+  const q = `geometry=${lon},${lat}&geometryType=esriGeometryPoint&sr=4326&layers=all&tolerance=0`
+    + `&mapExtent=${lon - 0.01},${lat - 0.01},${lon + 0.01},${lat + 0.01}&imageDisplay=800,800,96&returnGeometry=false&f=json`;
+  const res = await (await fetch(`${release.meta}/identify?${q}`)).json();
+  const a = (res.results || [])[0]?.attributes;
+  if (!a || !a.SRC_DATE) return null;
+  const d = String(a.SRC_DATE);
+  return { date: `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`, sensor: a.SRC_DESC, res: a.SRC_RES, release };
+}
+
+async function capturesAt(lon, lat) {
+  const key = `cap:${lon},${lat}`;
+  const cached = store.get(key);
+  if (cached) return cached.map((c) => ({ ...c, release: releases.find((r) => r.id === c.releaseId) })).filter((c) => c.release);
+  // Captures change rarely between releases: sample every third release, then bisect only where
+  // the capture differs between neighbours, instead of querying all ~100 releases per point.
+  const cache = new Map();
+  const at = async (k) => { if (!cache.has(k)) cache.set(k, captureAt(releases[k], lon, lat).catch(() => null)); return cache.get(k); };
+  const step = 3, probes = [];
+  for (let k = 0; k < releases.length; k += step) probes.push(k);
+  if (probes[probes.length - 1] !== releases.length - 1) probes.push(releases.length - 1);
+  for (let i = 0; i < probes.length; i += 8) await Promise.all(probes.slice(i, i + 8).map(at));
+  const bisect = async (lo, hi) => {
+    if (hi - lo < 2) return;
+    const [a, b] = [await at(lo), await at(hi)];
+    if (a?.date === b?.date) return;
+    const mid = (lo + hi) >> 1;
+    await at(mid);
+    await Promise.all([bisect(lo, mid), bisect(mid, hi)]);
+  };
+  await Promise.all(probes.slice(0, -1).map((k, i) => bisect(k, probes[i + 1])));
+  const found = (await Promise.all([...cache.values()])).filter(Boolean);
+  const byDate = new Map();
+  for (const c of found) if (!byDate.has(c.date)) byDate.set(c.date, c);
+  const out = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+  store.set(key, out.map(({ release, ...c }) => ({ ...c, releaseId: release.id })));
+  return out;
+}
+
+function leafOn(date) { const m = +date.slice(5, 7); return m >= 11 || m <= 4; }
+
+function pickCapture(captures, year) {
+  const same = captures.filter((c) => c.date.startsWith(year));
+  if (same.length) return same.find((c) => leafOn(c.date)) || same[0];
+  return null;
+}
+
+function square(lon, lat) {
+  const half = Math.sqrt(5000) / 2, mLat = 111320, mLon = 111320 * Math.cos(lat * Math.PI / 180);
+  const dy = half / mLat, dx = half / mLon;
+  const crosses = [];
+  for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) {
+    crosses.push([lat - dy + (2 * dy) * (i + 0.5) / 5, lon - dx + (2 * dx) * (j + 0.5) / 5]);
+  }
+  return { bounds: [[lat - dy, lon - dx], [lat + dy, lon + dx]], crosses, dx: dx / 10, dy: dy / 10 };
+}
+
+function radios(name, options, value) {
+  return options.map(([v, t]) => `<label class="opt"><input type="radio" name="${name}" value="${v}" ${v === value ? "checked" : ""}><span>${t}</span></label>`).join("");
+}
+
+function panelHtml(date, row) {
+  const g = (f) => row[`${f}_${date}`] || "";
+  return `<div class="panel" data-date="${date}">
+    <div class="row"><b>${date}</b><select id="cap_${date}"><option>buscando imágenes...</option></select><span id="capwarn_${date}" class="warn"></span></div>
+    <div class="map" id="map_${date}"></div>
+    <div class="row"><span class="k">Copa</span>${radios(`crown_${date}`, CROWN, g("crown"))}</div>
+    <div class="row"><span class="k">Cerca del umbral</span><input type="checkbox" id="near_${date}" ${g("near_threshold") ? "checked" : ""}> <span class="muted">2-3 o 6-7 cruces</span></div>
+    <div class="row"><span class="k">Parche</span>${radios(`patch_${date}`, PATCH, g("patch"))}</div>
+    <div class="row"><span class="k">Altura</span>${radios(`height_${date}`, HEIGHT, g("height") || "indeterminate")}</div>
+    <div class="row"><span class="k">Cortina &lt;60 m</span><input type="checkbox" id="strip_${date}" ${g("narrow_strip") ? "checked" : ""}></div>
+    <div class="row"><span class="k">Fuente / fecha</span>
+      <select id="src_${date}">${["esri_wayback", "google_earth", "other"].map((s) => `<option ${s === (g("imagery_source") || "esri_wayback") ? "selected" : ""}>${s}</option>`).join("")}</select>
+      <input type="text" id="date_${date}" value="${g("imagery_date")}" placeholder="AAAA-MM-DD" size="11"></div>
+    <div class="row"><span class="k">Sin etiqueta</span><input type="checkbox" id="skip_${date}" ${row[`label_${date}`] || !row.uninterpretable_reason ? "" : "checked"}> <span class="muted">no interpretable (escribí el motivo abajo)</span></div>
+    <div class="row"><span class="k">Etiqueta</span><span class="verdict" id="verdict_${date}"></span>
+      ${date !== data.dates[0] ? `<button data-copy="${date}">Igual que ${data.dates[0]}</button>` : ""}</div>
+  </div>`;
+}
+
+function value(name) { return document.querySelector(`input[name="${name}"]:checked`)?.value || ""; }
+
+function verdict(date) {
+  if ($(`skip_${date}`).checked) return "";
+  const crown = value(`crown_${date}`), patch = value(`patch_${date}`), height = value(`height_${date}`);
+  if (!crown) return null;
+  if (crown === "lt10") return "nonforest";
+  if (!patch || !height) return null;
+  return crown === "ge25" && patch !== "lt0.5" && ["ge5", "indeterminate"].includes(height) ? "forest" : "nonforest";
+}
+
+function refreshVerdicts() {
+  for (const d of data.dates) {
+    const v = verdict(d), el = $(`verdict_${d}`);
+    el.textContent = v === null ? "incompleta" : v === "" ? "sin etiqueta" : v === "forest" ? "bosque" : "no bosque";
+  }
+}
+
+function syncMaps(source) {
+  for (const m of maps) if (m !== source) m.setView(source.getCenter(), source.getZoom(), { animate: false });
+}
+
+async function show(i) {
+  idx = (i + data.rows.length) % data.rows.length;
+  store.set(`idx:${data.file}`, idx);
+  const row = data.rows[idx], lon = +row.lon, lat = +row.lat;
+  $("pid").textContent = row.point_id;
+  $("gearth").href = `https://earth.google.com/web/@${lat},${lon},200a,400d,35y,0h,0t,0r`;
+  $("reason").value = row.uninterpretable_reason || "";
+  $("notes").value = row.notes || "";
+  $("status").textContent = "";
+  updateProgress();
+
+  maps.forEach((m) => m.remove());
+  maps = [];
+  $("panels").innerHTML = data.dates.map((d) => panelHtml(d, row)).join("");
+  const sq = square(lon, lat);
+  for (const d of data.dates) {
+    const m = L.map(`map_${d}`, { zoomControl: true, maxZoom: 19 }).setView([lat, lon], 17);
+    L.rectangle(sq.bounds, { color: "#ffd400", weight: 2, fill: false }).addTo(m);
+    for (const [y, x] of sq.crosses) {
+      L.polyline([[y, x - sq.dx], [y, x + sq.dx]], { color: "#ffd400", weight: 1 }).addTo(m);
+      L.polyline([[y - sq.dy, x], [y + sq.dy, x]], { color: "#ffd400", weight: 1 }).addTo(m);
+    }
+    m.on("moveend", () => syncMaps(m));
+    m.layer = null;
+    maps.push(m);
+  }
+  document.querySelectorAll("#panels input").forEach((el) => el.addEventListener("change", refreshVerdicts));
+  document.querySelectorAll("[data-copy]").forEach((b) => b.addEventListener("click", () => copyFrom(data.dates[0], b.dataset.copy)));
+  refreshVerdicts();
+
+  const captures = await capturesAt(lon, lat);
+  if (data.rows[idx] !== row) return;
+  data.dates.forEach((d, k) => setupCaptures(d, maps[k], captures, row));
+}
+
+function setupCaptures(date, map, captures, row) {
+  const sel = $(`cap_${date}`);
+  const chosen = pickCapture(captures, date) || captures.reduce((best, c) => !best || Math.abs(+c.date.slice(0, 4) - date) < Math.abs(+best.date.slice(0, 4) - date) ? c : best, null);
+  sel.innerHTML = captures.map((c, k) => `<option value="${k}" ${c === chosen ? "selected" : ""}>${c.date} · ${c.sensor} · ${c.res} m${leafOn(c.date) ? " · hoja" : ""}</option>`).join("");
+  $(`capwarn_${date}`).textContent = chosen && chosen.date.startsWith(date) ? "" : `sin imagen de ${date} en Wayback: probá Google Earth`;
+  const apply = () => {
+    const c = captures[+sel.value];
+    if (!c) return;
+    if (map.layer) map.removeLayer(map.layer);
+    map.layer = L.tileLayer(c.release.url.replace("{level}", "{z}").replace("{row}", "{y}").replace("{col}", "{x}"), { maxZoom: 19, maxNativeZoom: 19 }).addTo(map);
+    map.layer.bringToBack();
+    if ($(`src_${date}`).value === "esri_wayback" && (!row[`imagery_date_${date}`] || sel.dataset.touched)) $(`date_${date}`).value = c.date;
+  };
+  sel.addEventListener("change", () => { sel.dataset.touched = "1"; apply(); });
+  apply();
+}
+
+function copyFrom(src, dst) {
+  for (const f of ["crown", "patch", "height"]) {
+    const v = value(`${f}_${src}`);
+    const el = document.querySelector(`input[name="${f}_${dst}"][value="${v}"]`);
+    if (el) el.checked = true;
+  }
+  $(`near_${dst}`).checked = $(`near_${src}`).checked;
+  $(`strip_${dst}`).checked = $(`strip_${src}`).checked;
+  refreshVerdicts();
+}
+
+function collect() {
+  const fields = { uninterpretable_reason: $("reason").value.trim(), notes: $("notes").value.trim() };
+  for (const d of data.dates) {
+    const v = verdict(d);
+    if (v === null) throw new Error(`${d}: falta completar copa, parche o altura (o marcar "sin etiqueta")`);
+    const crown = value(`crown_${d}`), woody = crown && crown !== "lt10";
+    Object.assign(fields, {
+      [`label_${d}`]: v, [`crown_${d}`]: v === "" ? "" : crown,
+      [`patch_${d}`]: v !== "" && woody ? value(`patch_${d}`) : "", [`height_${d}`]: v !== "" && woody ? value(`height_${d}`) : "",
+      [`near_threshold_${d}`]: v !== "" && $(`near_${d}`).checked ? "yes" : "", [`narrow_strip_${d}`]: v !== "" && $(`strip_${d}`).checked ? "yes" : "",
+      [`imagery_source_${d}`]: v === "" ? "" : $(`src_${d}`).value, [`imagery_date_${d}`]: v === "" ? "" : $(`date_${d}`).value.trim(),
+    });
+    if (v === "" && !fields.uninterpretable_reason) throw new Error(`${d} sin etiqueta: escribí el motivo en "No interpretable"`);
+  }
+  return fields;
+}
+
+async function save() {
+  const row = data.rows[idx];
+  let fields;
+  try { fields = collect(); } catch (e) { $("status").innerHTML = `<span class="err">${e.message}</span>`; return; }
+  const res = await fetch("/", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ point_id: row.point_id, fields }) });
+  if (!res.ok) { $("status").innerHTML = `<span class="err">${(await res.json()).error}</span>`; return; }
+  Object.assign(row, fields);
+  show(idx + 1);
+}
+
+function done(row) { return data.dates.every((d) => row[`label_${d}`]) || (row.uninterpretable_reason && data.dates.some((d) => !row[`label_${d}`])); }
+function updateProgress() { $("progress").textContent = `${idx + 1} / ${data.rows.length} · completos: ${data.rows.filter(done).length}`; }
+
+async function init() {
+  data = await (await fetch("/points")).json();
+  document.documentElement.style.setProperty("--n", data.dates.length);
+  document.title = `Etiquetado · ${data.file}`;
+  await loadReleases();
+  $("prev").onclick = () => show(idx - 1);
+  $("next").onclick = () => show(idx + 1);
+  $("nextEmpty").onclick = () => { const k = data.rows.findIndex((r, j) => j > idx && !done(r)); show(k >= 0 ? k : data.rows.findIndex((r) => !done(r))); };
+  $("save").onclick = save;
+  show(store.get(`idx:${data.file}`) || 0);
+}
+init();
+</script>
+</body>
+</html>
