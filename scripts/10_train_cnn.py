@@ -17,11 +17,11 @@ from torch.utils.data import DataLoader
 import classifier_report
 import dataset_loader as dl
 
-BATCH_SIZE = 32
-LEARNING_RATE = 0.001
+BATCH_SIZE = 16
+LEARNING_RATE = 0.0003
 MAX_EPOCHS = 100
 EARLY_STOP_PATIENCE = 10
-DROPOUT = 0.4
+DROPOUT = 0.5
 OUT_DIR = Path(__file__).resolve().parents[1] / "data" / "study_area"
 CHECKPOINT_PATH = OUT_DIR / "cnn_checkpoint.pt"
 EXPERIMENT_NAME = "phase1-classifier"
@@ -70,19 +70,19 @@ def seed_everything(seed):
     torch.manual_seed(seed)
 
 
-def train(seed=42, verbose=True):
+def train(seed=42, verbose=True, batch_size=BATCH_SIZE, lr=LEARNING_RATE, dropout=DROPOUT, max_epochs=MAX_EPOCHS):
     seed_everything(seed)
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    train_loader = DataLoader(dl.PatchDataset("train", augment=True), batch_size=BATCH_SIZE, shuffle=True)
-    val_loader = DataLoader(dl.PatchDataset("val", augment=False), batch_size=BATCH_SIZE)
+    train_loader = DataLoader(dl.PatchDataset("train", augment=True), batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(dl.PatchDataset("val", augment=False), batch_size=batch_size)
 
-    model = SmallCNN().to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    model = SmallCNN(dropout=dropout).to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     history = {"train_loss": [], "val_loss": [], "train_acc": [], "val_acc": []}
     best_val_loss, patience_left, best_state = float("inf"), EARLY_STOP_PATIENCE, None
-    for epoch in range(1, MAX_EPOCHS + 1):
+    for epoch in range(1, max_epochs + 1):
         train_loss, train_acc = run_epoch(model, train_loader, optimizer, device, train=True)
         val_loss, val_acc = run_epoch(model, val_loader, optimizer, device, train=False)
         for key, value in [("train_loss", train_loss), ("val_loss", val_loss), ("train_acc", train_acc), ("val_acc", val_acc)]:
@@ -103,6 +103,11 @@ def train(seed=42, verbose=True):
 
     model.load_state_dict(best_state)
     return model, device, history
+
+
+def epochs(history):
+    """Best epoch (lowest val loss, the weights train() keeps) and the epoch training stopped at."""
+    return int(np.argmin(history["val_loss"])) + 1, len(history["val_loss"])
 
 
 def evaluate(model, device, split="test"):
@@ -162,8 +167,10 @@ def main():
         save_checkpoint(model, seed=42)
         print(f"checkpoint saved: {CHECKPOINT_PATH}")
 
+        best_epoch, stop_epoch = epochs(history)
         mlflow.log_params({
             "seed": 42, "batch_size": BATCH_SIZE, "lr": LEARNING_RATE, "dropout": DROPOUT,
+            "best_epoch": best_epoch, "stop_epoch": stop_epoch,
         })
         mlflow.log_metric("macro_f1", results["report"]["macro avg"]["f1-score"])
         mlflow.log_metric("accuracy", results["report"]["accuracy"])

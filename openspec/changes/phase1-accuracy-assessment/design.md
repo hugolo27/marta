@@ -7,7 +7,7 @@ See proposal.md for motivation. Relevant current state:
 - Imagery access checked 2026-09-24:
   - Planet NICFI basemaps exist in GEE (4.77 m, Dec 2015-Aug 2026), but the project's service account has no access.
   - The NICFI contract with Planet expired in early 2025, and Norway cancelled the next-phase procurement in September 2025, so new sign-ups are unlikely.
-- The hyperparameter sweep scored on the test split, a known contamination issue (BITACORA 2026-09-19). The reference sample must not repeat that pattern.
+- An earlier hyperparameter sweep scored on the test split. It was never used for a decision, and `phase1-hyperparameter-selection` (archived 2026-10-13) replaced it with selection on the validation split. The reference sample must not repeat that pattern.
 
 ## Goals / Non-Goals
 

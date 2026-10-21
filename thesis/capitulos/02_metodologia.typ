@@ -14,7 +14,7 @@
 
 == Construcción del dataset
 
-Sentinel-2 (10m, 13 bandas) emparejado con etiquetas MapBiomas Chaco (30m) -- ratio
+Sentinel-2 L2A (10m, 12 bandas + NDVI; B10 no está en L2A) emparejado con etiquetas MapBiomas Chaco (30m) -- ratio
 exacto 3:1 en resolución. Cada ejemplo de entrenamiento es un patch de 33×33 píxeles
 (~330m de lado), no un solo píxel de 3×3 -- la CNN necesita contexto espacial real para
 tener algo que aprender. Tres clases por fecha: bosque / pasto / cultivo (código
@@ -54,16 +54,19 @@ distribuciones de corridas.
   [RF], [`max_depth`], [sin límite], [No es riesgoso en un forest -- la reducción de
     varianza viene de promediar árboles, no de podar],
   [CNN], [arquitectura], [32→64→128], [Red chica y propia, no un backbone pre-entrenado],
-  [CNN], [batch size], [32], [Estándar para ~1.673 ejemplos de entrenamiento],
-  [CNN], [learning rate], [0,001], [Default del paper original de Adam @kingma2014adam],
-  [CNN], [dropout], [0,4], [Rango estándar (0,3-0,5) para un dataset chico],
+  [CNN], [batch size], [16], [Elegido en validación; inicial 32, estándar para ~1.673 ejemplos],
+  [CNN], [learning rate], [0,0003], [Elegido en validación; inicial 0,001, default de Adam @kingma2014adam],
+  [CNN], [dropout], [0,5], [Elegido en validación, dentro del rango estándar (0,3-0,5)],
   [CNN], [épocas / paciencia], [100 / 10], [Corta tras 10 épocas sin mejora en validación],
 )
 
-Estos valores se fijaron una sola vez, citando rango estándar de literatura, y no se
-ajustaron empíricamente durante el desarrollo. Una barrida de sensibilidad de un
-parámetro a la vez (diseñada junto con el resto de esta metodología) verifica esta
-elección contra el propio dataset -- resultado en la sección de resultados de Fase 1.
+Los valores iniciales salen de rangos estándar de literatura. Después se eligieron en el
+split de validación, con una grilla completa por modelo, 5 semillas por configuración y una
+regla fijada antes de puntuar: la configuración inicial se mantiene salvo que la mejor la
+supere por más de la desviación estándar combinada. El RF se quedó con la inicial y la CNN
+cambió a los valores de la tabla. El test se evalúa una sola vez, con la configuración
+final; el detalle está en los resultados de Fase 1. En todo el trabajo, la dispersión entre
+semillas se reporta como desvío muestral.
 
 == Detección de cambio y evaluación de exactitud
 
@@ -73,8 +76,10 @@ reportaba 1.007 ha de pérdida de bosque; Hansen Global Forest Change registra 0
 de comisión. El producto principal pasó a ser el cambio bosque/no bosque, y el post-proceso
 se eligió con una regla escrita y registrada en MLflow antes de puntuar: entre 12
 configuraciones, la que menos pérdida falsa deja en el AOI sin perder más de la mitad de la
-pérdida confirmada en un área de desarrollo con deforestación real. Quedó elegida confianza
-≥ 0,7 en ambas fechas más persistencia en 2022: pérdida mapeada de 81,9 ha.
+pérdida confirmada en un área de desarrollo con deforestación real. Con la CNN final
+quedó elegida confianza ≥ 0,9 en ambas fechas más persistencia en 2022: pérdida mapeada de
+7,6 ha. (Con la CNN de hiperparámetros iniciales, la misma regla había elegido confianza
+≥ 0,7 y dejaba 81,9 ha.)
 
 *Evaluación contra referencia independiente.* La exactitud medida hasta ahí es acuerdo con
 otros mapas, no con el terreno. El test final usa la vara que el propio proyecto del caso

@@ -2,7 +2,7 @@
   "n_points": 241,
   "aoi_test_split_reference": {
     "rf_5seed_mean_macro_f1": 0.8110616249684363,
-    "cnn_5seed_mean_macro_f1": 0.8428697715052023,
+    "cnn_5seed_mean_macro_f1": 0.8599495897324996,
     "note": "5-seed means from comparison_results.json (scripts/11_compare_classifiers.py), read live rather than hardcoded so this can't go stale when that file is regenerated."
   },
   "bahia_negra_holdout": {
@@ -15,7 +15,7 @@
     ],
     "rf": {
       "macro_f1_mean": 0.6113314107175298,
-      "macro_f1_std": 0.0015697587615794107,
+      "macro_f1_std": 0.0017550436495837238,
       "macro_f1_runs": [
         0.6102,
         0.6115,
@@ -24,44 +24,44 @@
         0.609
       ],
       "accuracy_mean": 0.8804979253112034,
-      "accuracy_std": 0.0016597510373443922,
+      "accuracy_std": 0.0018556580726139266,
       "iou_per_class_mean": {
         "bosque": 0.8893,
         "pasto": 0.8061,
         "cultivo": 0.0
       },
       "iou_per_class_std": {
-        "bosque": 0.0073,
-        "pasto": 0.0055,
+        "bosque": 0.0081,
+        "pasto": 0.0061,
         "cultivo": 0.0
       }
     },
     "cnn": {
-      "macro_f1_mean": 0.6109334511791962,
-      "macro_f1_std": 0.01644400072372706,
+      "macro_f1_mean": 0.6193699453147634,
+      "macro_f1_std": 0.004375123957633568,
       "macro_f1_runs": [
-        0.5785,
-        0.6211,
-        0.614,
-        0.6198,
-        0.6213
+        0.6169,
+        0.6239,
+        0.6239,
+        0.6141,
+        0.618
       ],
-      "accuracy_mean": 0.887136929460581,
-      "accuracy_std": 0.027945988780884196,
+      "accuracy_mean": 0.9020746887966805,
+      "accuracy_std": 0.00629284269215894,
       "iou_per_class_mean": {
-        "bosque": 0.8723,
-        "pasto": 0.8219,
+        "bosque": 0.8825,
+        "pasto": 0.8529,
         "cultivo": 0.0
       },
       "iou_per_class_std": {
-        "bosque": 0.031,
-        "pasto": 0.0525,
+        "bosque": 0.0145,
+        "pasto": 0.0106,
         "cultivo": 0.0
       }
     },
-    "pooled_std": 0.01168052443967075,
-    "cnn_minus_rf": -0.0003979595383336587,
-    "winner": "inconclusive",
+    "pooled_std": 0.0033333082558175873,
+    "cnn_minus_rf": 0.008038534597233582,
+    "winner": "cnn",
     "note": "5-seed mean/std (code review 2026-09-12), same protocol as 11_compare_classifiers.py's AOI comparison \u2014 replaces the earlier single seed=42-only numbers, which had no variance estimate."
   },
   "worldcover_cross_check": {
@@ -94,28 +94,28 @@
     },
     "cnn": {
       "agreement_rate": {
-        "bosque": 0.5825242718446602,
-        "pasto": 0.7096774193548387,
-        "cultivo": 0.07142857142857142
+        "bosque": 0.5517241379310345,
+        "pasto": 0.7672413793103449,
+        "cultivo": 0.0
       },
       "confusion": {
         "bosque": {
-          "other": 37,
-          "bosque": 60,
-          "pasto (proxy debil)": 6,
+          "other": 45,
+          "bosque": 64,
+          "pasto (proxy debil)": 7,
           "cultivo": 0
         },
         "pasto": {
-          "other": 20,
-          "bosque": 8,
-          "pasto (proxy debil)": 88,
-          "cultivo": 8
+          "other": 14,
+          "bosque": 4,
+          "pasto (proxy debil)": 89,
+          "cultivo": 9
         },
         "cultivo": {
-          "other": 4,
+          "other": 2,
           "bosque": 0,
-          "pasto (proxy debil)": 9,
-          "cultivo": 1
+          "pasto (proxy debil)": 7,
+          "cultivo": 0
         }
       }
     },

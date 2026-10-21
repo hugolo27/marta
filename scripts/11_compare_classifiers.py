@@ -43,7 +43,10 @@ def main():
             rf = train_rf.train(seed=seed, verbose=False)
             rf_results = train_rf.evaluate(rf)
             rf_scores.append(macro_f1(rf_results))
-            log_run("rf", seed, {"n_estimators": train_rf.N_ESTIMATORS}, rf_results)
+            log_run("rf", seed, {
+                "n_estimators": train_rf.N_ESTIMATORS, "max_depth": train_rf.MAX_DEPTH,
+                "max_features": train_rf.MAX_FEATURES,
+            }, rf_results)
 
             model, device, _ = train_cnn.train(seed=seed, verbose=False)
             cnn_results = train_cnn.evaluate(model, device)
@@ -56,8 +59,8 @@ def main():
             print(f"seed {seed}: RF macro-F1={rf_scores[-1]:.3f}  CNN macro-F1={cnn_scores[-1]:.3f}")
 
         rf_arr, cnn_arr = np.array(rf_scores), np.array(cnn_scores)
-        rf_mean, rf_std = rf_arr.mean(), rf_arr.std()
-        cnn_mean, cnn_std = cnn_arr.mean(), cnn_arr.std()
+        rf_mean, rf_std = rf_arr.mean(), rf_arr.std(ddof=1)
+        cnn_mean, cnn_std = cnn_arr.mean(), cnn_arr.std(ddof=1)
         pooled_std = np.sqrt((rf_std**2 + cnn_std**2) / 2)
         cnn_wins = bool(cnn_mean - rf_mean > pooled_std)
 

@@ -1,6 +1,6 @@
 {
   "config": {
-    "confidence": 0.7,
+    "confidence": 0.9,
     "persistence": true,
     "mmu": false
   },
@@ -10,20 +10,20 @@
       "ha": 12985.5
     },
     "stable_forest": {
-      "pixels": 1751743,
-      "ha": 17517.4
+      "pixels": 1867423,
+      "ha": 18674.2
     },
     "stable_nonforest": {
-      "pixels": 282747,
-      "ha": 2827.5
+      "pixels": 193217,
+      "ha": 1932.2
     },
     "loss": {
-      "pixels": 8189,
-      "ha": 81.9
+      "pixels": 764,
+      "ha": 7.6
     },
     "gain": {
-      "pixels": 18770,
-      "ha": 187.7
+      "pixels": 45,
+      "ha": 0.5
     }
   }
 }
