@@ -39,13 +39,18 @@ into CO2 tons — in a way that's auditable end to end?
 | Training dataset | [`training-dataset`](../openspec/specs/training-dataset/spec.md) | [`2026-09-13-phase1-dataset-build`](../openspec/changes/archive/2026-09-13-phase1-dataset-build/) | `06_align_3x3_patches.py`, `08_assemble_dataset.py` |
 | Land cover classifier | [`land-cover-classifier`](../openspec/specs/land-cover-classifier/spec.md) | [`2026-09-13-phase1-classifier`](../openspec/changes/archive/2026-09-13-phase1-classifier/) | `09_train_random_forest.py`, `10_train_cnn.py`, `11_compare_classifiers.py` |
 | Temporal change detection | [`temporal-change-detection`](../openspec/specs/temporal-change-detection/spec.md) | [`2026-09-13-phase1-temporal-comparison`](../openspec/changes/archive/2026-09-13-phase1-temporal-comparison/) | `18_classify_aoi_temporal.py`, `19_temporal_change_map.py`, `20_mapbiomas_cross_check.py` |
+| Dataset v2 and variant selection | `training-dataset`, `land-cover-classifier` (deltas) | [`phase1-dataset-v2`](../openspec/changes/phase1-dataset-v2/) (in progress), [`phase1-patch-size`](../openspec/changes/phase1-patch-size/) | `33_spatial_autocorrelation.py`, `08_assemble_dataset.py`, `31_patch_size_selection.py`, `34_variant_selection.py` |
 | Grad-CAM interpretability | [`grad-cam-interpretability`](../openspec/specs/grad-cam-interpretability/spec.md) | [`2026-09-13-phase1-grad-cam`](../openspec/changes/archive/2026-09-13-phase1-grad-cam/) | `21_grad_cam.py`, `22_explain_transition.py` |
 
 ## How a training example is built
 
-Sentinel-2 L2A (10m, 12 bands + NDVI; B10 is not in L2A) paired with MapBiomas labels (30m), an exact 3:1 pixel ratio.
-Each training example is a 33×33 pixel patch (~330m per side), not a single 3×3 pixel —
-the CNN needs real spatial context to have anything to learn from. Three classes per
+Sentinel-2 L2A (10m, 12 bands + NDVI; B10 is not in L2A) paired with MapBiomas labels (30m), an exact 3:1 pixel ratio,
+so one MapBiomas pixel matches a 3×3 block of Sentinel-2 pixels. Each year has two cloud-free
+median composites: dry season (June-September) and wet season (January-April of the same
+year). Each example stores a 33×33 window (~330m per side) with 26 channels (13 dry, 13 wet);
+the operational CNN reads its central 3×3 block. 1,000 points per class and year, 5,993
+examples after quality checks (dataset v2, October 2026; the earlier dataset had 400 per class
+and year, dry season only, and a 33×33 CNN input). Three classes per
 date: forest / pasture / cropland (MapBiomas code 15 specifically = actual pasture, not
 to be confused with natural grassland, which is a different code). "Deforestation" isn't
 a class the model predicts directly — it's derived by comparing the same location's
@@ -86,17 +91,24 @@ occurrence flipped the RF-vs-CNN conclusion: "RF wins clearly" → "technical ti
   Forest's by more than one combined standard deviation across the 5 runs each.
   [`scripts/11_compare_classifiers.py`](../scripts/11_compare_classifiers.py).
 
-### Hyperparameters: selected on the validation split
+### Current configuration (dataset v2)
 
 | Model | Parameter | Value | Why |
 |---|---|---|---|
-| Random Forest | `n_estimators` | 400 | Standard range (300-500); variance reduction has diminishing returns past a few hundred trees |
-| Random Forest | `max_depth` | unlimited | Not risky in a forest — overfitting reduction comes from averaging many distinct trees, not pruning each one |
-| CNN | Architecture | 3 conv blocks (32→64→128 filters) | Small and custom, not a pretrained backbone — keeps Grad-CAM legible and the comparison against RF honest |
-| CNN | Batch size | 16 | Selected on val (below); initial value 32 |
-| CNN | Learning rate | 0.0003 | Selected on val (below); initial value 0.001, the Adam paper's default (Kingma & Ba, 2014) |
-| CNN | Dropout | 0.5 | Selected on val (below), within the standard range (0.3-0.5) |
-| CNN | Max epochs / patience | 100 / 10 | Training stops if validation loss doesn't improve for 10 epochs, instead of an arbitrary fixed epoch count |
+| Random Forest | Input | center pixel, dry + wet (26 values) | Selected on val over dry only |
+| Random Forest | `n_estimators` | 500 | Selected on val from 300, 400, 500 |
+| Random Forest | `max_depth` | unlimited | Selected on val; averaging many distinct trees, not pruning, is what limits overfitting |
+| CNN | Input | 3×3 block, dry + wet, standardized per channel with train-split statistics | 3×3 from the patch-size experiment; season selected on val |
+| CNN | Architecture | 3 conv blocks (32→64→128 filters), 100,707 weights | Small and custom, not a pretrained backbone |
+| CNN | Batch size | 32 | Selected on val from 8, 16, 32, 64 |
+| CNN | Learning rate | 0.0001 | Selected on val from 0.0001, 0.0003, 0.001, around the Adam default (Kingma & Ba, 2014) |
+| CNN | Dropout | 0.3 | Selected on val from 0.3 to 0.6 |
+| CNN | Max epochs / patience | 100 / 10 | Training stops if validation loss doesn't improve for 10 epochs; no run hit the cap |
+
+How these were chosen is in "Dataset v2 and variant selection" below. The next paragraphs
+describe the first selection, on the earlier dataset.
+
+### Hyperparameters: first selection on the validation split (earlier dataset)
 
 The initial values were set once to standard literature values. What moved the result across
 the review rounds was fixing pipeline bugs and dataset-design decisions, not the
@@ -119,6 +131,41 @@ Test was then evaluated once, with these configurations. An earlier one-at-a-tim
 seeds) had been scored on the test split
 ([`hyperparameter_sweep_test_split.json`](../data/study_area/hyperparameter_sweep_test_split.json)).
 It was not used to choose anything, including the grid values, and is kept only as a record.
+
+## Dataset v2 and variant selection (October 2026)
+
+Prompted by the tutor's review: the CNN input size had never been tested against the original
+3×3 design, and the ~2 km split blocks had been set by hand.
+
+- **Input size** ([`phase1-patch-size`](../openspec/changes/phase1-patch-size/)): the same CNN
+  reading only the central 3×3 block, with its own grid on val. Val: 3×3 0.837 ± 0.010, 33×33
+  0.844 ± 0.008, a difference inside the pooled std (0.009), so by the pre-registered rule 3×3
+  became operational. The work continues with 3×3 input.
+- **Block size from data** ([`data/study_area/spatial_autocorrelation/`](../data/study_area/spatial_autocorrelation/)):
+  semivariograms of NDVI and of the MapBiomas class over 18,000 points give practical ranges of
+  3.9 to 5.2 km, above the ~2 km blocks. The block side is now 6 km (Roberts et al., 2017;
+  Valavi et al., 2019), so earlier test scores were probably optimistic.
+- **Blocks were assigned per class**: one square could send its forest points to train and its
+  pasture points to test. Now every point in a block goes to the same split, and the build stops
+  if a class ends up with under 10% of its points in val or test.
+- **Input normalization**: bands range ~70-4,700 and NDVI -0.3 to 0.9, so unscaled, NDVI barely
+  reached the CNN's first layer. Each channel is standardized with train-split statistics,
+  stored with the weights.
+- **Dry vs. dry + wet**, 1,000 points per class and year, a wider grid with an edge rule.
+
+Variants and rules were pre-registered before scoring (hash in MLflow, two dated amendments:
+normalization, and 3×3 only), see
+[`data/study_area/variant_selection/README.md`](../data/study_area/variant_selection/README.md):
+
+| Variant | Val | Test |
+|---|---|---|
+| RF, dry | 0.827 ± 0.002 | 0.799 ± 0.004 |
+| RF, dry + wet | 0.845 ± 0.002 | 0.841 ± 0.003 |
+| CNN 3×3, dry | 0.843 ± 0.003 | 0.835 ± 0.007 |
+| CNN 3×3, dry + wet | 0.869 ± 0.007 | 0.865 ± 0.003 |
+
+The wet season wins for both models, well beyond seed noise, so both operational models use
+dry + wet. Val and test now nearly match.
 
 ## What changed along the way
 
@@ -146,6 +193,7 @@ It was not used to choose anything, including the grid values, and is kept only 
 | Review round 4 | 0.773 | 0.778 | Technical tie (held) | spatial buffer check made mandatory and automatic on every dataset build, not a one-off manual verification |
 | Review rounds 5-8 | 0.811 | 0.843 | **CNN wins** | second leakage found (between 2019/2023), dataset doubled to 400/class, all 3 held-out regions rerun with 5 seeds |
 | Tutor review of this PR | 0.811 | 0.860 | **CNN wins** | hyperparameters selected on val, test evaluated once, sample standard deviations |
+| Dataset v2 | 0.841 | 0.865 | **CNN wins** | 6 km blocks from the variogram, class-agnostic blocks, 3×3 input, dry + wet, normalization, 1,000 per class |
 
 None of this was "tuning to improve the number" — each change came from asking "is this
 actually valid?", and the result sometimes got worse or flipped direction instead of
@@ -155,9 +203,10 @@ improving.
 
 ### On the AOI test split
 
-**Random Forest 0.811 F1 macro (±0.005), CNN 0.860 (±0.008)**, a +0.049 difference,
-above the pre-registered threshold (pooled std 0.007). Configurations selected on val, test
-evaluated once; with the initial configurations the CNN also won (0.843 vs. 0.811). Raw numbers: [`data/study_area/comparison_results.json`](../data/study_area/comparison_results.json).
+**Random Forest 0.841 F1 macro (±0.003), CNN 0.865 (±0.003)**, a +0.024 difference,
+above the pre-registered threshold (pooled std 0.003). 915 test examples in 6 km blocks,
+variants and configurations selected on val, test evaluated once. On the earlier dataset it
+was 0.811 vs. 0.860, with blocks smaller than the autocorrelation range. Raw numbers: [`data/study_area/comparison_results.json`](../data/study_area/comparison_results.json).
 This answers one question only — which model wins on the AOI's own test split — not
 which classifier the system should actually use; that needs evidence from outside the
 AOI.
@@ -170,9 +219,9 @@ it became the reported result):
 
 | Region | Landscape | RF | CNN | Result | Raw data |
 |---|---|---|---|---|---|
-| Filadelfia | Mennonite farming colony, fragmented forest | 0.831 ± 0.001 | 0.706 ± 0.016 | **RF wins, decisively** | [`filadelfia_holdout_results.json`](../data/study_area/filadelfia_holdout_results.json) |
-| Bahía Negra | Continuous, remote forest | 0.611 ± 0.002 | 0.619 ± 0.004 | **CNN wins**, narrowly (+0.008 vs. pooled std 0.003) | [`bahia_negra_holdout_results.json`](../data/study_area/bahia_negra_holdout_results.json) |
-| Pozo Colorado | Cattle ranching, Trans-Chaco highway | 0.661 ± 0.007 | 0.727 ± 0.017 | **CNN wins** | [`pozo_colorado_holdout_results.json`](../data/study_area/pozo_colorado_holdout_results.json) |
+| Filadelfia | Mennonite farming colony, fragmented forest | 0.839 ± 0.004 | 0.824 ± 0.010 | **RF wins** (earlier: 0.831 vs. 0.706) | [`filadelfia_holdout_results.json`](../data/study_area/filadelfia_holdout_results.json) |
+| Bahía Negra | Continuous, remote forest | 0.621 ± 0.001 | 0.627 ± 0.005 | **CNN wins**, narrowly (+0.006 vs. pooled std 0.004) | [`bahia_negra_holdout_results.json`](../data/study_area/bahia_negra_holdout_results.json) |
+| Pozo Colorado | Cattle ranching, Trans-Chaco highway | 0.668 ± 0.004 | 0.710 ± 0.027 | **CNN wins** | [`pozo_colorado_holdout_results.json`](../data/study_area/pozo_colorado_holdout_results.json) |
 
 ### Why the CNN specifically fails in Filadelfia
 
@@ -185,7 +234,9 @@ misclassified forest points sit systematically on **narrow forest strips** (Menn
 windbreak hedgerows, a standard feature of that agriculture) that don't fill the model's
 330m window. The CNN partly learned "forest" as large, contiguous canopy — a pattern
 that doesn't transfer to forest fragmented into thin strips. Random Forest, looking only
-at the center pixel, has no such failure mode.
+at the center pixel, has no such failure mode. With the 3×3 input (90 m) the gap shrank
+from 0.125 to 0.015, consistent with that diagnosis; the failure has not been re-analyzed
+point by point with the new model.
 
 ### Decision: CNN as the operational classifier
 
@@ -233,29 +284,33 @@ The same trained CNN checkpoint is applied to both dates — never retrained per
 avoid mixing training variance with real change.
 [`scripts/18_classify_aoi_temporal.py`](../scripts/18_classify_aoi_temporal.py) →
 [`scripts/19_temporal_change_map.py`](../scripts/19_temporal_change_map.py). Named
-transitions detected with the current checkpoint: `forest_to_pasture` (896 ha), `cropland_to_forest`
-(626 ha), `pasture_to_forest` (491 ha), `cropland_to_pasture` (462 ha). Full numbers:
+transitions detected with the current checkpoint: `pasture_to_forest` (1,228 ha), `forest_to_pasture`
+(436 ha), `cropland_to_pasture` (113 ha), `cropland_to_forest` (104 ha). With the earlier 33×33
+checkpoint, transitions involving cropland (absent from the AOI) totalled ~1,090 ha; now ~220 ha. Full numbers:
 [`data/study_area/change_stats_2019_2023.json`](../data/study_area/change_stats_2019_2023.json).
 
 **Honest finding**, from cross-checking against MapBiomas
 ([`scripts/20_mapbiomas_cross_check.py`](../scripts/20_mapbiomas_cross_check.py),
 [`data/study_area/mapbiomas_agreement.json`](../data/study_area/mapbiomas_agreement.json)):
-`no_change` agrees 99.7% of the time, but each specific transition type agrees very
-little (0-8.9%). Most detected transitions are probably classifier noise at the
+`no_change` agrees 99.5% of the time, but each specific transition type agrees very
+little (0-11.4%; the highest is `pasture_to_forest`). Most detected transitions are probably classifier noise at the
 forest/pasture boundary, not confirmed real change — flagged plainly rather than
 presented as validated.
 
 That finding led to `phase1-change-detection-hardening` (archived): the main product is now
 forest/non-forest change, with post-processing chosen by a pre-registered rule against Hansen
-and MapBiomas. With the current checkpoint the rule selects confidence ≥ 0.9 on both dates plus
-persistence into 2022: 7.6 ha of mapped loss in the AOI, 0.5 ha of gain (mapped, not yet
-assessed). Details: [`data/study_area/change_hardening/README.md`](../data/study_area/change_hardening/README.md).
+and MapBiomas. With the current checkpoint the rule selects confidence ≥ 0.9 on both dates,
+persistence into 2022 and a minimum mapping unit: 8.1 ha of mapped loss in the AOI (7.6 ha with
+the earlier checkpoint) and 61.0 ha of gain (0.5 ha earlier), mapped, not yet assessed. The
+jump in gain is checked by the reference sample, whose gain stratum now holds 6,034 pixels
+instead of 45. Details: [`data/study_area/change_hardening/README.md`](../data/study_area/change_hardening/README.md).
 The final test against interpreted reference points is `phase1-accuracy-assessment`, in progress.
 
 ## Grad-CAM — per-prediction interpretability
 
-A heatmap per prediction showing which part of the 33×33 patch actually supported the
-classification. Sharpened with Guided Grad-CAM (combines Grad-CAM with guided
+A heatmap per prediction showing which part of the input actually supported the
+classification. With the 3×3 input the native map is 3×3 pixels: it shows which part of the
+block weighed, not wider spatial context. The text below describes the earlier 33×33 version. Sharpened with Guided Grad-CAM (combines Grad-CAM with guided
 backpropagation) — the native heatmap is 8×8, this adds real detail without fabricating
 resolution. Also applied to transition pixels, explaining *both* halves (2019 and 2023)
 of a detected change, not just that the diff changed. Applies only to the CNN — Random

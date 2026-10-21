@@ -1,8 +1,8 @@
 {
   "n_points": 241,
   "aoi_test_split_reference": {
-    "rf_5seed_mean_macro_f1": 0.8110616249684363,
-    "cnn_5seed_mean_macro_f1": 0.8599495897324996,
+    "rf_5seed_mean_macro_f1": 0.8413127138025353,
+    "cnn_5seed_mean_macro_f1": 0.865077865777377,
     "note": "5-seed means from comparison_results.json (scripts/11_compare_classifiers.py), read live rather than hardcoded so this can't go stale when that file is regenerated."
   },
   "bahia_negra_holdout": {
@@ -14,107 +14,107 @@
       2026
     ],
     "rf": {
-      "macro_f1_mean": 0.6113314107175298,
-      "macro_f1_std": 0.0017550436495837238,
+      "macro_f1_mean": 0.620614657210402,
+      "macro_f1_std": 0.001287955376184838,
       "macro_f1_runs": [
-        0.6102,
-        0.6115,
-        0.6129,
-        0.6131,
-        0.609
+        0.6226,
+        0.6197,
+        0.6213,
+        0.6197,
+        0.6197
       ],
-      "accuracy_mean": 0.8804979253112034,
-      "accuracy_std": 0.0018556580726139266,
+      "accuracy_mean": 0.9062240663900415,
+      "accuracy_std": 0.0022727077074903078,
       "iou_per_class_mean": {
-        "bosque": 0.8893,
-        "pasto": 0.8061,
+        "bosque": 0.8952,
+        "pasto": 0.847,
         "cultivo": 0.0
       },
       "iou_per_class_std": {
-        "bosque": 0.0081,
-        "pasto": 0.0061,
+        "bosque": 0.0,
+        "pasto": 0.0066,
         "cultivo": 0.0
       }
     },
     "cnn": {
-      "macro_f1_mean": 0.6193699453147634,
-      "macro_f1_std": 0.004375123957633568,
+      "macro_f1_mean": 0.6265353732410774,
+      "macro_f1_std": 0.005166348751968304,
       "macro_f1_runs": [
-        0.6169,
-        0.6239,
-        0.6239,
-        0.6141,
-        0.618
+        0.6314,
+        0.6229,
+        0.6314,
+        0.6271,
+        0.6198
       ],
-      "accuracy_mean": 0.9020746887966805,
-      "accuracy_std": 0.00629284269215894,
+      "accuracy_mean": 0.9203319502074688,
+      "accuracy_std": 0.009462036722814442,
       "iou_per_class_mean": {
-        "bosque": 0.8825,
-        "pasto": 0.8529,
+        "bosque": 0.8974,
+        "pasto": 0.8758,
         "cultivo": 0.0
       },
       "iou_per_class_std": {
-        "bosque": 0.0145,
-        "pasto": 0.0106,
+        "bosque": 0.009,
+        "pasto": 0.0196,
         "cultivo": 0.0
       }
     },
-    "pooled_std": 0.0033333082558175873,
-    "cnn_minus_rf": 0.008038534597233582,
+    "pooled_std": 0.003764969354324672,
+    "cnn_minus_rf": 0.005920716030675455,
     "winner": "cnn",
     "note": "5-seed mean/std (code review 2026-09-12), same protocol as 11_compare_classifiers.py's AOI comparison \u2014 replaces the earlier single seed=42-only numbers, which had no variance estimate."
   },
   "worldcover_cross_check": {
     "rf": {
       "agreement_rate": {
-        "bosque": 0.5423728813559322,
-        "pasto": 0.7685185185185185,
-        "cultivo": 0.06666666666666667
+        "bosque": 0.5470085470085471,
+        "pasto": 0.7913043478260869,
+        "cultivo": 0.1111111111111111
       },
       "confusion": {
         "bosque": {
-          "other": 46,
+          "other": 47,
           "bosque": 64,
-          "pasto (proxy debil)": 8,
+          "pasto (proxy debil)": 6,
           "cultivo": 0
         },
         "pasto": {
-          "other": 13,
+          "other": 12,
           "bosque": 4,
-          "pasto (proxy debil)": 83,
+          "pasto (proxy debil)": 91,
           "cultivo": 8
         },
         "cultivo": {
           "other": 2,
           "bosque": 0,
-          "pasto (proxy debil)": 12,
+          "pasto (proxy debil)": 6,
           "cultivo": 1
         }
       }
     },
     "cnn": {
       "agreement_rate": {
-        "bosque": 0.5517241379310345,
-        "pasto": 0.7672413793103449,
+        "bosque": 0.5423728813559322,
+        "pasto": 0.7711864406779662,
         "cultivo": 0.0
       },
       "confusion": {
         "bosque": {
           "other": 45,
           "bosque": 64,
-          "pasto (proxy debil)": 7,
+          "pasto (proxy debil)": 9,
           "cultivo": 0
         },
         "pasto": {
           "other": 14,
           "bosque": 4,
-          "pasto (proxy debil)": 89,
+          "pasto (proxy debil)": 91,
           "cultivo": 9
         },
         "cultivo": {
           "other": 2,
           "bosque": 0,
-          "pasto (proxy debil)": 7,
+          "pasto (proxy debil)": 3,
           "cultivo": 0
         }
       }

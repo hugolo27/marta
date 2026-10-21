@@ -56,7 +56,7 @@ def heldout_geometry():
 
 
 def extract_points(heldout):
-    """Stratified sample + batched patch extraction, one row per point: 33x33x13 S2 patch,
+    """Stratified sample + batched patch extraction, one row per point: 33x33x26 S2 patch,
     MapBiomas class_id (ground truth), and the co-located WorldCover class (independent
     cross-check label). Same all-zero-pixel gap skip as 08_assemble_dataset.py."""
     rows = []
@@ -71,8 +71,8 @@ def extract_points(heldout):
         # same multi-zone condition 08_assemble_dataset.py guards against (see s2_utils
         # docstring) — reproject=True here would distort pixels on one side of that meridian
         # before scoring (code review 2026-09-11).
-        s2 = s2_utils.build_s2_composite(heldout, start, end, add_ndvi=True, reproject=False, clip=True)
-        channels = s2_utils.S2_BANDS + ["NDVI"]
+        # Always dry+wet: each model keeps the channels of its own season (holdout_eval, SmallCNN).
+        s2, channels = s2_utils.build_season_composite(heldout, start, end, "drywet", reproject=False, clip=True)
 
         mapbiomas = ee.Image(mapbiomas_legend.MAPBIOMAS_ASSET)
         from_codes, to_codes = mapbiomas_legend.remap_expression(f"classification_{period}")
@@ -116,7 +116,7 @@ def extract_points(heldout):
             for feat in features:
                 props = feat["properties"]
                 arrays = [np.array(props[ch]) for ch in channels]
-                patch = np.stack(arrays, axis=-1)  # (33, 33, 13)
+                patch = np.stack(arrays, axis=-1)  # (33, 33, 26)
 
                 if np.any(np.all(patch == 0, axis=-1)):
                     skipped_gap += 1

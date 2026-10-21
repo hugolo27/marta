@@ -26,7 +26,7 @@ def macro_f1(results):
 
 def predict_rf(rows, model):
     center = rows[0]["patch"].shape[0] // 2  # derived from the array, not a hardcoded radius
-    X = np.stack([r["patch"][center, center, :] for r in rows])
+    X = np.stack([r["patch"][center, center, dl.SEASON_CHANNELS[model.season]] for r in rows])
     return model.predict(X)
 
 
