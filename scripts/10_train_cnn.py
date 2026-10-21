@@ -22,23 +22,31 @@ LEARNING_RATE = 0.0003
 MAX_EPOCHS = 100
 EARLY_STOP_PATIENCE = 10
 DROPOUT = 0.5
+PATCH_PX = 33
 OUT_DIR = Path(__file__).resolve().parents[1] / "data" / "study_area"
 CHECKPOINT_PATH = OUT_DIR / "cnn_checkpoint.pt"
 EXPERIMENT_NAME = "phase1-classifier"
 
 
 class SmallCNN(nn.Module):
-    def __init__(self, in_channels=13, n_classes=3, dropout=DROPOUT):
+    """patch_px=3 crops the central 3x3 block (one MapBiomas pixel) out of whatever patch it gets,
+    so the 33x33 data paths stay as they are; a 3x3 map can't be pooled twice (phase1-patch-size D1)."""
+
+    def __init__(self, in_channels=13, n_classes=3, dropout=DROPOUT, patch_px=PATCH_PX):
         super().__init__()
+        self.patch_px = patch_px
+        pool = nn.MaxPool2d(2) if patch_px > 3 else nn.Identity()
         self.features = nn.Sequential(
-            nn.Conv2d(in_channels, 32, 3, padding=1), nn.BatchNorm2d(32), nn.ReLU(), nn.MaxPool2d(2),
-            nn.Conv2d(32, 64, 3, padding=1), nn.BatchNorm2d(64), nn.ReLU(), nn.MaxPool2d(2),
+            nn.Conv2d(in_channels, 32, 3, padding=1), nn.BatchNorm2d(32), nn.ReLU(), pool,
+            nn.Conv2d(32, 64, 3, padding=1), nn.BatchNorm2d(64), nn.ReLU(), pool,
             nn.Conv2d(64, 128, 3, padding=1), nn.BatchNorm2d(128), nn.ReLU(),
         )
         self.pool = nn.AdaptiveAvgPool2d(1)
         self.classifier = nn.Sequential(nn.Dropout(dropout), nn.Linear(128, n_classes))
 
     def forward(self, x):
+        start = (x.shape[-1] - self.patch_px) // 2
+        x = x[..., start:start + self.patch_px, start:start + self.patch_px]
         x = self.features(x)
         x = self.pool(x).flatten(1)
         return self.classifier(x)
@@ -70,14 +78,15 @@ def seed_everything(seed):
     torch.manual_seed(seed)
 
 
-def train(seed=42, verbose=True, batch_size=BATCH_SIZE, lr=LEARNING_RATE, dropout=DROPOUT, max_epochs=MAX_EPOCHS):
+def train(seed=42, verbose=True, batch_size=BATCH_SIZE, lr=LEARNING_RATE, dropout=DROPOUT, max_epochs=MAX_EPOCHS,
+          patch_px=PATCH_PX):
     seed_everything(seed)
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     train_loader = DataLoader(dl.PatchDataset("train", augment=True), batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(dl.PatchDataset("val", augment=False), batch_size=batch_size)
 
-    model = SmallCNN(dropout=dropout).to(device)
+    model = SmallCNN(dropout=dropout, patch_px=patch_px).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     history = {"train_loss": [], "val_loss": [], "train_acc": [], "val_acc": []}
@@ -127,13 +136,13 @@ def save_checkpoint(model, seed, path=CHECKPOINT_PATH):
     """Persists trained weights so a downstream script (phase1-temporal-comparison) can apply
     the exact same decision boundary to more than one date, instead of retraining per use --
     every prior phase1-classifier script trained transiently since none needed that (design.md)."""
-    torch.save({"state_dict": model.state_dict(), "seed": seed}, path)
+    torch.save({"state_dict": model.state_dict(), "seed": seed, "patch_px": model.patch_px}, path)
 
 
 def load_checkpoint(path=CHECKPOINT_PATH, device=None):
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
     checkpoint = torch.load(path, map_location=device)
-    model = SmallCNN().to(device)
+    model = SmallCNN(patch_px=checkpoint.get("patch_px", 33)).to(device)
     model.load_state_dict(checkpoint["state_dict"])
     model.eval()
     return model, device
@@ -169,7 +178,7 @@ def main():
 
         best_epoch, stop_epoch = epochs(history)
         mlflow.log_params({
-            "seed": 42, "batch_size": BATCH_SIZE, "lr": LEARNING_RATE, "dropout": DROPOUT,
+            "seed": 42, "batch_size": BATCH_SIZE, "lr": LEARNING_RATE, "dropout": DROPOUT, "patch_px": PATCH_PX,
             "best_epoch": best_epoch, "stop_epoch": stop_epoch,
         })
         mlflow.log_metric("macro_f1", results["report"]["macro avg"]["f1-score"])

@@ -73,10 +73,15 @@ def _minmax(arr):
     return (arr - lo) / (hi - lo + 1e-8)
 
 
-def upsample_cam(cam, size):
+def upsample_cam(cam, size, patch_px=33):
+    """A 3x3-input CNN only sees the central block, so its CAM is drawn over that block and left at
+    zero elsewhere instead of being stretched over the whole patch (phase1-patch-size D5)."""
     t = torch.from_numpy(cam).float()[None, None]
-    up = F.interpolate(t, size=(size, size), mode="bilinear", align_corners=False)
-    return up[0, 0].numpy()
+    up = F.interpolate(t, size=(patch_px, patch_px), mode="bilinear", align_corners=False)[0, 0].numpy()
+    canvas = np.zeros((size, size), dtype=up.dtype)
+    start = (size - patch_px) // 2
+    canvas[start:start + patch_px, start:start + patch_px] = up
+    return canvas
 
 
 def _register_guided_relu_hooks(model):
@@ -126,7 +131,7 @@ def guided_grad_cam(model, patch_chw, target_class, device):
         raw_cam = gc.raw_cam(patch_chw, target_class, device)
     finally:
         gc.remove()
-    cam_upsampled = upsample_cam(raw_cam, size=patch_chw.shape[-1])
+    cam_upsampled = upsample_cam(raw_cam, size=patch_chw.shape[-1], patch_px=model.patch_px)
     saliency = guided_backprop_saliency(model, patch_chw, target_class, device)
     sharpened = _minmax(cam_upsampled * saliency)
     return {
@@ -135,7 +140,7 @@ def guided_grad_cam(model, patch_chw, target_class, device):
     }
 
 
-def render_overlay(patch_hwc, heatmap, title, out_path):
+def render_overlay(patch_hwc, heatmap, title, out_path, cam_px=8):
     """Overlay on true color, not a bare heatmap -- same true-color normalization as
     13_visualize_classification_map.py (B4/B3/B2, /3000 clipped to [0,1])."""
     rgb = np.clip(patch_hwc[:, :, RGB_IDX] / 3000, 0, 1)
@@ -144,7 +149,7 @@ def render_overlay(patch_hwc, heatmap, title, out_path):
     axes[0].set_title("True color")
     axes[1].imshow(rgb)
     axes[1].imshow(heatmap, cmap="jet", alpha=0.5)
-    axes[1].set_title("Guided Grad-CAM (8x8 native, upsampled)")
+    axes[1].set_title(f"Guided Grad-CAM ({cam_px}x{cam_px} native)")
     for ax in axes:
         ax.axis("off")
     fig.suptitle(title, fontsize=10)
@@ -185,7 +190,8 @@ def main():
         pred = int(model(patch_chw.unsqueeze(0).to(device)).argmax(1).item())
         result = guided_grad_cam(model, patch_chw, pred, device)
         out_path = OUT_DIR / f"gradcam_example_{class_name}.png"
-        render_overlay(patch, result["sharpened"], f"{class_name} (predicted: {dl.CLASS_NAMES[pred]})", out_path)
+        render_overlay(patch, result["sharpened"], f"{class_name} (predicted: {dl.CLASS_NAMES[pred]})", out_path,
+                       cam_px=result["raw_cam_8x8"].shape[0])
         print(f"saved: {out_path}")
 
 
