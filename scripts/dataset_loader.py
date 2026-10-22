@@ -109,17 +109,23 @@ def tile_block(row):
 
 
 @lru_cache(maxsize=None)
-def load_tile(path, tile_px=192):
-    """Center crop of a tile as int16 image (H, W, 26) and int64 label (H/3, W/3), cached because
-    every epoch re-reads the same files. The crop keeps the 3x3 alignment: tiles are 192 px and the
-    allowed sizes are multiples of 48."""
+def _load_full_tile(path):
+    """Cached once per file, whatever crop sizes are asked for, because every epoch re-reads the
+    same files."""
     data = np.load(REPO_ROOT / path)
-    offset = (data["image"].shape[0] - tile_px) // 2
-    image = data["image"][offset:offset + tile_px, offset:offset + tile_px]
-    label = data["label"][offset // 3:(offset + tile_px) // 3, offset // 3:(offset + tile_px) // 3].astype(np.int64) - 1
+    image, label = data["image"], data["label"].astype(np.int64) - 1
     image.flags.writeable = False
     label.flags.writeable = False
     return image, label
+
+
+def load_tile(path, tile_px=192):
+    """Center crop of a tile as int16 image (H, W, 26) and int64 label (H/3, W/3). The crop keeps
+    the 3x3 alignment: tiles are 192 px and the allowed sizes are multiples of 48."""
+    image, label = _load_full_tile(path)
+    offset = (image.shape[0] - tile_px) // 2
+    return (image[offset:offset + tile_px, offset:offset + tile_px],
+            label[offset // 3:(offset + tile_px) // 3, offset // 3:(offset + tile_px) // 3])
 
 
 def tile_to_float(image):
@@ -129,15 +135,24 @@ def tile_to_float(image):
 
 
 def tile_channel_stats(rows, tile_px=192):
-    """Per-channel mean and standard deviation over every pixel of the given (training) tiles."""
-    total, total_sq, n = np.zeros(26), np.zeros(26), 0
-    for row in rows:
+    """Per-channel mean and standard deviation over the pixels of the given (training) tiles, in two
+    passes (one formula with E[x^2] - mean^2 can cancel to a negative variance). Pixels with a gap
+    in either composite are left out: their zeros would pull the mean down and inflate the std."""
+    def pixels(row):
         image = tile_to_float(load_tile(row["path"], tile_px)[0]).reshape(-1, 26).astype(np.float64)
+        gap = np.all(image.reshape(-1, 2, 13) == 0, axis=-1).any(axis=-1)
+        return image[~gap]
+
+    total, n = np.zeros(26), 0
+    for row in rows:
+        image = pixels(row)
         total += image.sum(axis=0)
-        total_sq += (image ** 2).sum(axis=0)
         n += len(image)
     mean = total / n
-    return mean.astype(np.float32), np.sqrt(total_sq / n - mean ** 2).astype(np.float32)
+    total_sq = np.zeros(26)
+    for row in rows:
+        total_sq += ((pixels(row) - mean) ** 2).sum(axis=0)
+    return mean.astype(np.float32), np.sqrt(total_sq / n).astype(np.float32)
 
 
 def block_features(rows, tile_px=192):

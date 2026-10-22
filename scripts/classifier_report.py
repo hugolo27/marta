@@ -39,5 +39,7 @@ def dice_counts(pred, labels):
 def dice_from_counts(counts):
     inter, pred, true = counts[..., 0], counts[..., 1], counts[..., 2]
     with np.errstate(invalid="ignore", divide="ignore"):
-        dice = np.where(pred + true > 0, 2 * inter / (pred + true), 1.0)
-    return dice, dice.mean(axis=-1)
+        dice = np.where(pred + true > 0, 2 * inter / (pred + true), np.nan)
+    # A class absent from both labels and predictions is left out of the mean, as nnU-Net does;
+    # predicted but absent from the labels it scores 0.
+    return dice, np.nanmean(dice, axis=-1)

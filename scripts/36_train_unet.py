@@ -79,13 +79,15 @@ def probs_30m(logits):
 
 def loss_fn(p30, labels):
     """Cross-entropy on the 30 m probabilities plus soft Dice over the batch (Milletari et al., 2016),
-    both without the ignored cells."""
+    both without the ignored cells. A class absent from the batch is left out of the Dice term: its
+    Dice can only reach 1 by predicting it nowhere, and cross-entropy already penalizes it there."""
     keep = labels != dl.IGNORE
     ce = F.nll_loss(p30.clamp_min(1e-8).log(), labels, ignore_index=dl.IGNORE)
     onehot = F.one_hot(labels.clamp_min(0), N_CLASSES).permute(0, 3, 1, 2) * keep[:, None]
     p = p30 * keep[:, None]
     dice = (2 * (p * onehot).sum((0, 2, 3)) + 1e-5) / (p.sum((0, 2, 3)) + onehot.sum((0, 2, 3)) + 1e-5)
-    return ce + 1 - dice.mean()
+    present = onehot.sum((0, 2, 3)) > 0
+    return ce + (1 - dice)[present].sum() / present.sum().clamp_min(1)
 
 
 def device_name():
@@ -141,7 +143,8 @@ def predict_counts_full(model, rows, device):
 
 
 def evaluate(model, rows, device):
-    dice, macro = classifier_report.dice_from_counts(predict_counts(model, rows, device).sum(axis=0))
+    """On the whole 192 px tile, the cells 38 scores, so the epoch kept is the best on those cells."""
+    dice, macro = classifier_report.dice_from_counts(predict_counts_full(model, rows, device).sum(axis=0))
     return {"dice": dict(zip(dl.CLASS_NAMES, dice.tolist())), "macro_dice": float(macro)}
 
 

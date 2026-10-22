@@ -173,7 +173,7 @@ def score():
         u, rf = best(rows, tie), best(rf_rows, lambda r: r["config"]["n_estimators"])
         pooled = float(np.sqrt((u["std"] ** 2 + rf["std"] ** 2) / 2))
         results["selection"] = {"unet": u["config"], "rf": rf["config"], "unet_mean": u["mean"], "rf_mean": rf["mean"],
-                                "unet_minus_rf": u["mean"] - rf["mean"], "pooled_std": pooled,
+                                "unet_max_epochs": u["max_epochs"], "unet_minus_rf": u["mean"] - rf["mean"], "pooled_std": pooled,
                                 "unet_better": u["mean"] - rf["mean"] > pooled, "edges_run": edges}
         save(results)
         mlflow.log_dict(results["selection"], "selection.json")
@@ -190,7 +190,7 @@ def test():
     mlflow.set_experiment(EXPERIMENT_NAME)
     with mlflow.start_run(run_name="test_once"):
         for seed in selection.SEEDS:
-            model, device, _ = unet.train(data["train"], data["val"], seed=seed, max_epochs=pilot["max_epochs"],
+            model, device, _ = unet.train(data["train"], data["val"], seed=seed, max_epochs=sel["unet_max_epochs"],
                                           patience=pilot["patience"] or pilot["max_epochs"], verbose=False, **sel["unet"])
             dice, macro = classifier_report.dice_from_counts(unet.predict_counts_full(model, data["test"], device).sum(axis=0))
             out["unet"].append({"seed": seed, "macro_dice": float(macro), "dice": dict(zip(dl.CLASS_NAMES, dice.tolist()))})
