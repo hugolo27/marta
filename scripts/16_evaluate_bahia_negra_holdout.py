@@ -112,7 +112,7 @@ def extract_points(heldout):
                 arrays = [np.array(props[ch]) for ch in channels]
                 patch = np.stack(arrays, axis=-1)  # (33, 33, 26)
 
-                if np.any(np.all(patch == 0, axis=-1)):
+                if holdout_eval.has_gap(patch):
                     skipped_gap += 1
                     continue
 

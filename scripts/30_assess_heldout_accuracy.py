@@ -57,7 +57,7 @@ def classify_region(name, model, device):
         for feat in patch_image.sampleRegions(collection=batch, scale=10, properties=["point_id"]).getInfo()["features"]:
             props = feat["properties"]
             patch = np.stack([np.array(props[ch]) for ch in channels], axis=-1)
-            if np.any(np.all(patch == 0, axis=-1)):
+            if holdout_eval.has_gap(patch):
                 gaps.add(props["point_id"])
                 continue
             rows[props["point_id"]] = {"patch": patch}
