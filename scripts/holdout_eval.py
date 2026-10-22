@@ -24,9 +24,16 @@ def macro_f1(results):
     return results["report"]["macro avg"]["f1-score"]
 
 
+def has_gap(patch):
+    """A pixel all-zero in either composite is a gap: a dry+wet patch with only the wet one missing
+    would otherwise be scored on fake zero reflectance (same per-composite check as 08)."""
+    composites = patch.reshape(*patch.shape[:-1], -1, dl.SEASON_CHANNELS["dry"].stop)
+    return bool(np.any(np.all(composites == 0, axis=-1)))
+
+
 def predict_rf(rows, model):
     center = rows[0]["patch"].shape[0] // 2  # derived from the array, not a hardcoded radius
-    X = np.stack([r["patch"][center, center, :] for r in rows])
+    X = np.stack([r["patch"][center, center, dl.SEASON_CHANNELS[model.season]] for r in rows])
     return model.predict(X)
 
 

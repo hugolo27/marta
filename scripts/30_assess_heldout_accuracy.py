@@ -45,8 +45,7 @@ def read_csv(path):
 def classify_region(name, model, device):
     region = assemble.heldout_rectangle(name)
     points = read_csv(OUT_DIR / f"heldout_{name}_sample_design.csv")
-    s2 = s2_utils.build_s2_composite(region, *PERIOD, add_ndvi=True, reproject=False, clip=True)
-    channels = s2_utils.S2_BANDS + ["NDVI"]
+    s2, channels = s2_utils.build_season_composite(region, *PERIOD, model.season, reproject=False, clip=True)
     patch_image = s2.select(channels).neighborhoodToArray(ee.Kernel.square(PATCH_RADIUS_PX, "pixels"))
 
     rows, gaps = {}, set()
@@ -58,7 +57,7 @@ def classify_region(name, model, device):
         for feat in patch_image.sampleRegions(collection=batch, scale=10, properties=["point_id"]).getInfo()["features"]:
             props = feat["properties"]
             patch = np.stack([np.array(props[ch]) for ch in channels], axis=-1)
-            if np.any(np.all(patch == 0, axis=-1)):
+            if holdout_eval.has_gap(patch):
                 gaps.add(props["point_id"])
                 continue
             rows[props["point_id"]] = {"patch": patch}

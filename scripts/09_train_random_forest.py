@@ -9,24 +9,27 @@ from sklearn.ensemble import RandomForestClassifier
 import classifier_report
 import dataset_loader as dl
 
-N_ESTIMATORS = 400
+N_ESTIMATORS = 500
 MAX_DEPTH = None
 MAX_FEATURES = "sqrt"
+SEASON = "drywet"
 
 
-def train(seed=42, verbose=True, n_estimators=N_ESTIMATORS, max_depth=MAX_DEPTH, max_features=MAX_FEATURES):
-    X_train, y_train = dl.load_pixel_features("train")
+def train(seed=42, verbose=True, n_estimators=N_ESTIMATORS, max_depth=MAX_DEPTH, max_features=MAX_FEATURES,
+          season=SEASON):
+    X_train, y_train = dl.load_pixel_features("train", season)
     if verbose:
         counts = Counter(y_train)
         print("Training class distribution:", {dl.CLASS_NAMES[k]: v for k, v in sorted(counts.items())})
     rf = RandomForestClassifier(n_estimators=n_estimators, max_depth=max_depth, max_features=max_features,
                                 random_state=seed, n_jobs=-1)
     rf.fit(X_train, y_train)
+    rf.season = season
     return rf
 
 
 def evaluate(rf, split="test"):
-    X, y = dl.load_pixel_features(split)
+    X, y = dl.load_pixel_features(split, rf.season)
     pred = rf.predict(X)
     return classifier_report.evaluate_predictions(y, pred)
 

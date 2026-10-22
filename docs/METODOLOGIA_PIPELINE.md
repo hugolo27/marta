@@ -17,7 +17,7 @@ flowchart TD
 
     subgraph CLASS["Clasificación (variable discreta)"]
         S2A["Sentinel-2, 2019 y 2023"]
-        CNNRF["CNN vs. Random Forest<br/>bosque / pasto / cultivo<br/>ventana 33×33 px"]
+        CNNRF["CNN vs. Random Forest<br/>bosque / pasto / cultivo<br/>bloque 3×3 px, seca + húmeda"]
         CHANGE["Cambio de cobertura<br/>bosque → no-bosque"]
         S2A --> CNNRF --> CHANGE
     end
@@ -145,18 +145,27 @@ no posee. Se confirmó una superposición de 0 ha con el AOI del caso de estudio
 ### 3.1 Clasificación de cobertura (variable discreta, componente retrospectivo)
 
 Los datos de entrenamiento se muestrean sobre la huella de muestreo, no solo sobre el AOI del caso
-de estudio, por lo explicado en la sección 2. Cada ejemplo de entrenamiento es una ventana
+de estudio, por lo explicado en la sección 2. Cada ejemplo de entrenamiento guarda una ventana
 Sentinel-2 de 33×33 píxeles centrada en un bloque de 3×3 píxeles nativos (10 m) que corresponde
 exactamente a un píxel de MapBiomas (30 m). Esa correspondencia 3×3 sale directo de la relación de
 resolución (30 m equivale a 3 × 10 m) y se obtiene reproyectando MapBiomas sobre la grilla propia
-de Sentinel-2. La ventana de 33×33 px es la que ve el modelo como entrada, para darle contexto
-espacial real; el bloque de 3×3 sigue siendo únicamente la unidad de alineación con la etiqueta. La
+de Sentinel-2. Desde el dataset v2 (`phase1-dataset-v2`, octubre de 2026) la CNN operativa lee
+solo el bloque central de 3×3, el diseño original del tutor: con la ventana completa de 33×33 no
+superó al 3×3 en validación (`phase1-patch-size`). La ventana completa se sigue guardando. Cada
+ejemplo lleva 26 canales: 12 bandas + NDVI del compuesto de época seca (junio a septiembre) y lo
+mismo del de época húmeda (enero a abril del mismo año). Son 1.000 puntos por clase y año, 5.993
+ejemplos después de los controles de calidad (antes: 400 por clase y año, solo época seca). La
 clase no incluye "desmonte" como cuarta categoría: MapBiomas clasifica el estado de la cobertura
 por año, no eventos de tala, así que el cambio se obtiene comparando dos clasificaciones de fechas
 distintas, en vez de predecirse directamente.
 
-Las divisiones de entrenamiento, validación y prueba se asignan por bloque espacial (~2 km,
-agrupados por clase) y no por punto individual: dos parches a 330 m o menos de distancia pueden
+Las divisiones de entrenamiento, validación y prueba se asignan por bloque espacial y no por punto
+individual. El lado del bloque es 6 km: el mayor alcance práctico de los semivariogramas de NDVI y
+de clase de MapBiomas (3,9 a 5,2 km), redondeado hacia arriba (Roberts et al., 2017; Valavi et
+al., 2019; `data/study_area/spatial_autocorrelation/`). Antes era ~2 km, fijado a mano, y los
+bloques se armaban por clase, de modo que un mismo cuadrado podía repartir su bosque y su pasto
+entre grupos distintos; ahora todos los puntos de un bloque van al mismo grupo y el armado se
+detiene si una clase queda con menos del 10 % en validación o en test. Además, dos parches a 330 m o menos de distancia pueden
 corresponder al mismo terreno real, así que una asignación puramente aleatoria por punto arriesga
 contaminación entre conjuntos. Un chequeo posterior de distancia mínima confirma que ningún par de
 parches entre conjuntos distintos queda por debajo de esa distancia. El muestreo de entrenamiento
@@ -169,20 +178,29 @@ Los composites de cada período se arman enmascarando nubes por-píxel vía la b
 Classification Layer), no por el metadato más grueso de nubosidad por escena. Para 2019: 25 escenas,
 36,4 % de nubosidad promedio por escena, 0 % de hueco residual tras el compositing. Para 2023: 24
 escenas, 44,2 %, también 0 % de hueco residual. Ambos muy por debajo del umbral de 5 % fijado como
-criterio → no hace falta sumar Sentinel-1 SAR para cubrir huecos.
+criterio → no hace falta sumar Sentinel-1 SAR para cubrir huecos. El compuesto húmedo (1.670
+escenas en 2019 y 1.688 en 2023 sobre el área de muestreo) no deja zonas sin dato a escala de
+500 m, y al armar el dataset no hizo descartar ningún ejemplo.
+
+**Normalización de la entrada de la CNN.** Las bandas van de ~70 a ~4.700 (reflectancia por
+10.000) y el NDVI de −0,3 a 0,9; sin escalar, el NDVI casi no pesa en la primera capa. Cada canal
+se estandariza con la media y el desvío del grupo de entrenamiento, guardados con los pesos del
+modelo, así que todos los scripts que usan la CNN aplican la misma escala. El Random Forest no se
+normaliza: sus cortes no dependen de la escala.
 
 **Hiperparámetros de entrenamiento, con su criterio de elección**
 
 | Modelo | Parámetro | Valor | Criterio |
 |---|---|---|---|
-| Random Forest | Número de árboles | 400 | Rango estándar (300-500): la reducción de varianza tiene retornos decrecientes pasados unos cientos de árboles |
+| Random Forest | Número de árboles | 500 | Elegido en validación entre 300, 400 y 500 (dataset v2) |
 | Random Forest | Profundidad máxima | Sin límite | La reducción de varianza de un bosque aleatorio viene de promediar muchos árboles individualmente sobreajustados, no de limitar la profundidad de cada uno |
-| Random Forest | Variables de entrada | 12 bandas + NDVI del píxel central del parche | No se usa la ventana espacial completa: el modelo no puede aprovechar el contexto espacial que sí usa la CNN, así que dársela no aportaría una comparación más justa, solo mayor dimensionalidad |
+| Random Forest | Variables de entrada | 12 bandas + NDVI del píxel central, en época seca y húmeda (26 valores) | No se usa la ventana espacial completa: el modelo no puede aprovechar el contexto espacial que sí usa la CNN, así que dársela no aportaría una comparación más justa, solo mayor dimensionalidad |
 | CNN | Arquitectura | 3 bloques convolucionales (32/64/128 filtros) + pooling global + dropout | Deliberadamente pequeña, no un modelo pre-entrenado grande: mantiene legible una eventual capa de interpretabilidad y no oscurece la comparación contra el baseline |
-| CNN | Tamaño de lote | 16 | Elegido en validación (ver abajo); el valor inicial era 32, estándar para un conjunto de este orden |
-| CNN | Tasa de aprendizaje | 0,0003 | Elegida en validación (ver abajo); el valor inicial era 0,001, el recomendado en la publicación original de Adam (Kingma y Ba, 2014) |
+| CNN | Entrada | Bloque de 3×3, época seca y húmeda, normalizado | Tamaño de `phase1-patch-size`; época elegida en validación (dataset v2) |
+| CNN | Tamaño de lote | 32 | Elegido en validación entre 8, 16, 32 y 64 (dataset v2) |
+| CNN | Tasa de aprendizaje | 0,0001 | Elegida en validación entre 0,0001, 0,0003 y 0,001, alrededor del valor recomendado en la publicación original de Adam (Kingma y Ba, 2014) |
 | CNN | Épocas máximas / paciencia | 100 / 10 | El entrenamiento se corta si la pérdida de validación deja de mejorar durante 10 épocas seguidas, en vez de fijar a priori un número de épocas arbitrario |
-| CNN | Dropout | 0,5 | Elegido en validación (ver abajo), dentro del rango estándar (0,3-0,5) para un conjunto de entrenamiento acotado |
+| CNN | Dropout | 0,3 | Elegido en validación entre 0,3 y 0,6 (dataset v2) |
 | CNN | Aumentado de datos | Rotaciones de 90°/180°/270° y espejado | Válido para imágenes satelitales vistas cenitalmente. No se aplica aumentado de color o brillo: los valores de reflectancia de Sentinel-2 tienen significado físico, y distorsionarlos podría dañar la señal en lugar de mejorar la generalización |
 
 Los valores iniciales se fijaron una vez con rangos estándar de literatura. Lo que cambió el
@@ -190,7 +208,25 @@ resultado de la sección 5 en las rondas de revisión fueron bugs de pipeline (s
 distorsión de zona UTM, fuga espacial) y decisiones de diseño de datos (volumen de entrenamiento,
 unificación de splits entre períodos), no los hiperparámetros.
 
-**Selección de hiperparámetros en validación** (`phase1-hyperparameter-selection`,
+**Selección de variantes en el dataset v2** (`phase1-dataset-v2`, `scripts/34_variant_selection.py`,
+`data/study_area/variant_selection/`). Con la entrada de 3×3 se comparó época seca contra seca +
+húmeda para la CNN y para el RF. Cada variante eligió sus hiperparámetros en validación (CNN: `lr`
+{0,0001, 0,0003, 0,001} × `dropout` {0,3 a 0,6} × `batch_size` {8, 16, 32, 64}, con un paso extra
+si el ganador cae en el borde; RF: la grilla de abajo), 5 semillas. Regla registrada antes de
+puntuar (hash en MLflow, dos enmiendas con fecha: normalización y solo 3×3): la variante de época
+seca se mantiene salvo que la otra la supere por más de la desviación combinada.
+
+| Variante | Validación | Test |
+|---|---|---|
+| RF, seca | 0,827 ± 0,002 | 0,799 ± 0,004 |
+| RF, seca + húmeda | 0,845 ± 0,002 | 0,841 ± 0,003 |
+| CNN 3×3, seca | 0,843 ± 0,003 | 0,835 ± 0,007 |
+| CNN 3×3, seca + húmeda | 0,869 ± 0,007 | 0,865 ± 0,003 |
+
+La época húmeda gana en los dos modelos por mucho más que el ruido, así que ambos operativos usan
+seca + húmeda. Test se evaluó una sola vez, después de decidir.
+
+**Primera selección de hiperparámetros en validación, dataset anterior** (`phase1-hyperparameter-selection`,
 `scripts/24_hyperparameter_selection.py`, `data/study_area/hyperparameter_selection/`). Grilla
 completa para cada modelo: RF con `n_estimators` {300, 400, 500} × `max_depth` {sin límite, 10,
 20} × `max_features` {"sqrt", 0,5} (18 configuraciones); CNN con `lr` {0,0001, 0,0003, 0,001, 0,01}
@@ -271,19 +307,20 @@ limitación documentada explícitamente, no escondida.
 
 ### 5.1 Comparación de precisión sobre el AOI
 
-Sobre el conjunto de prueba del AOI (~360 ejemplos, nunca usados en entrenamiento ni ajuste),
-promediando 5 corridas con distinta semilla, sobre el dataset final (2.393 patches, 400 por
-clase/período, sin fuga espacial verificada):
+Sobre el conjunto de prueba (915 ejemplos en bloques de 6 km, nunca usados en entrenamiento ni
+ajuste), promediando 5 corridas con distinta semilla, sobre el dataset v2 (5.993 patches, 1.000
+por clase y período):
 
 | Modelo | F1 macro promedio | Desviación estándar |
 |---|---|---|
-| Random Forest | 0,811 | 0,005 |
-| CNN | 0,860 | 0,008 |
+| Random Forest (seca + húmeda) | 0,841 | 0,003 |
+| CNN 3×3 (seca + húmeda) | 0,865 | 0,003 |
 
-La diferencia (+0,049 a favor de la CNN) supera el umbral de una desviación estándar combinada
-(0,007, desvío muestral) fijado antes de correr el experimento. Son las configuraciones elegidas en
-validación (sección 3.1), evaluadas en test una sola vez; con las iniciales la CNN también ganaba
-(0,843 contra 0,811). Por el criterio pre-registrado, **la CNN gana esta
+La diferencia (+0,024 a favor de la CNN) supera el umbral de una desviación estándar combinada
+(0,003, desvío muestral) fijado antes de correr el experimento. Son las variantes y
+configuraciones elegidas en validación (sección 3.1), evaluadas en test una sola vez. Con el
+dataset anterior (bloques de ~2 km, por debajo del alcance de la autocorrelación) daba 0,811
+contra 0,860, probablemente optimista. Por el criterio pre-registrado, **la CNN gana esta
 comparación**, y lo hizo de forma consistente en 3 volúmenes/huellas de datos distintos probados
 durante el desarrollo (ver la nota de trazabilidad al final de esta sección). Ambos modelos
 muestran el mismo patrón de error: la confusión entre pasto y cultivo es sistemáticamente mayor
@@ -298,9 +335,9 @@ corridas de re-entrenamiento para tener una estimación real de varianza (no sol
 
 | Región | Perfil de paisaje | RF (media ± desvío) | CNN (media ± desvío) | Resultado |
 |---|---|---|---|---|
-| Filadelfia (Boquerón) | Colonia agrícola menonita, bosque fragmentado | 0,831 ± 0,001 | 0,706 ± 0,016 | **RF gana, decisivo** (gana en las 5 semillas) |
-| Bahía Negra (Alto Paraguay) | Bosque continuo, remoto | 0,611 ± 0,002 | 0,619 ± 0,004 | **CNN gana**, por margen chico (+0,008 contra 0,003) |
-| Pozo Colorado (Presidente Hayes) | Ganadería, ruta Trans-Chaco | 0,661 ± 0,007 | 0,727 ± 0,017 | **CNN gana**, confirmado |
+| Filadelfia (Boquerón) | Colonia agrícola menonita, bosque fragmentado | 0,839 ± 0,004 | 0,824 ± 0,010 | **RF gana** (con la CNN de 33×33: 0,831 contra 0,706) |
+| Bahía Negra (Alto Paraguay) | Bosque continuo, remoto | 0,621 ± 0,001 | 0,627 ± 0,005 | **CNN gana**, por margen chico (+0,006 contra 0,004) |
+| Pozo Colorado (Presidente Hayes) | Ganadería, ruta Trans-Chaco | 0,668 ± 0,004 | 0,710 ± 0,027 | **CNN gana** |
 
 **Nota metodológica, vale la pena dejarla explícita**: la primera corrida de estas 3 regiones (una
 sola semilla cada una) sugería "RF gana en 2 de 3" — con las 5 semillas, ese resultado en Bahía
@@ -345,7 +382,8 @@ en silencio — es, en sí mismo, parte de cómo se construyó la confianza en e
 ## 6. Justificación de cada modelo
 
 **CNN.** Candidata de clasificación porque puede aprovechar contexto espacial (textura, patrones de
-dosel) dentro de la ventana de 33×33 píxeles. Un clasificador que evalúa cada píxel de forma
+dosel) dentro de su entrada; con el bloque de 3×3 actual ese contexto se limita al píxel y sus
+vecinos inmediatos. Un clasificador que evalúa cada píxel de forma
 aislada no puede sacarle provecho a eso por más ajustado que esté, así que si el CNN gana, gana por
 una razón estructural real, no solo por mejor ajuste.
 
@@ -430,7 +468,10 @@ metodológico válido, no una falla del diseño.
   desarrollo, así que esta vez pasan la regla las configuraciones con confianza ≥ 0,9. Elegida:
   **confianza ≥ 0,9 en ambas fechas + persistencia**. Pérdida falsa en el AOI de 899,4 a 7,1 ha
   (bloques de 30 m) y retención del 88,3 % de la pérdida confirmada en el área de desarrollo. Mapa
-  final del AOI: pérdida 7,6 ha, ganancia 0,5 ha (áreas mapeadas, no evaluadas). Detalle y tabla completa:
+  final del AOI con esa CNN: pérdida 7,6 ha, ganancia 0,5 ha. Con la CNN del dataset v2 (3×3, seca +
+  húmeda) la misma regla elige confianza ≥ 0,9 + persistencia + unidad mínima de mapeo: pérdida
+  8,1 ha, ganancia 61,0 ha (áreas mapeadas, no evaluadas; la ganancia, a verificar con la muestra
+  de referencia) y 85,7 % de la pérdida confirmada retenida. Detalle y tabla completa:
   `data/study_area/change_hardening/README.md` y `scores.json`. Queda
   `phase1-accuracy-assessment` (test contra puntos interpretados con la vara VM0007, áreas
   ajustadas por error): la Fase 2 consume esas áreas ajustadas, no las mapeadas.

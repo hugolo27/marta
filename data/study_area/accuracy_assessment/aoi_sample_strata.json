@@ -9,22 +9,22 @@
     "stable_nonforest": 60
   },
   "stratum_px": {
-    "loss": 764,
-    "gain": 45,
-    "discarded_change": 201105,
-    "buffer": 2115,
-    "stable_forest": 1762616,
-    "stable_nonforest": 81373
+    "loss": 811,
+    "gain": 6034,
+    "discarded_change": 169320,
+    "buffer": 5661,
+    "stable_forest": 1825663,
+    "stable_nonforest": 40529
   },
   "valid_px": 2048018,
   "map_change_px": {
-    "stable_forest": 1854014,
-    "stable_nonforest": 193195,
-    "loss": 764,
-    "gain": 45
+    "stable_forest": 1873348,
+    "stable_nonforest": 167825,
+    "loss": 811,
+    "gain": 6034
   },
   "excluded_edge_px": 13431,
-  "buffer_60m_share": 0.0010327057672344677,
-  "buffer_90m_share_for_reference": 0.0011000879875079222,
+  "buffer_60m_share": 0.0027641358620871495,
+  "buffer_90m_share_for_reference": 0.004925249680422731,
   "reference_loss_px": 690
 }

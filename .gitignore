@@ -25,6 +25,7 @@ data/study_area/dataset_prebugfix_backup/
 data/study_area/dataset_preclip_backup/
 data/study_area/dataset_pre3heldout_backup/
 data/study_area/dataset_pre400_backup/
+data/study_area/dataset_v1_backup/
 notebooks/*.zip
 data/study_area/source_documents/*.pdf
 data/study_area/source_documents/*.png
