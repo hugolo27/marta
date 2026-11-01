@@ -78,5 +78,10 @@ Run 2026-10-20 on the M4 (MPS), `results.json` and MLflow `phase1-unet-pilot`. P
   degenerates to a straight line in log(n): about +0.016 per doubling, no plateau in sight.
 - Rule 7: RF means 0.8211 / 0.8212 / 0.8207 / 0.8201 / 0.8189, `s_rf` = 0.0003, sample size
   25,000.
+- Amendment (2026-10-22, after the run): tiles of different 6 km blocks were not kept apart beyond
+  their block, and 75 pairs of training and validation tiles had centers closer than the tile
+  diagonal (2.7 km), so they could share ground. Validation scores here are likely slightly
+  optimistic. Pilot 3 (`../unet_pilot3/README.md`) repeats the pilot with a buffer of the autocorrelation range and
+  its decisions replace these.
 - Time: 18.3 min per 100-epoch run at 96 px with 1,251 train tiles (about 11 s per epoch,
   validation included).

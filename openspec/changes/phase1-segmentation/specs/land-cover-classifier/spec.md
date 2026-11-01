@@ -28,6 +28,13 @@ The system SHALL set the early-stopping patience, the validation and test split 
 - **WHEN** the pilot starts
 - **THEN** the blocks reserved for test have already been set aside and no pilot step reads them
 
+### Requirement: Spatial buffer between splits
+The system SHALL leave out of training and validation any tile that comes within the largest practical range of the semivariograms of a tile it must be kept apart from, measured edge to edge between footprints: pool tiles near a test tile, and training tiles near a validation tile.
+
+#### Scenario: Training tile near validation
+- **WHEN** a training tile's footprint lies within that range of a validation tile's footprint
+- **THEN** the tile is used by no step and is counted as left out by the buffer
+
 ### Requirement: Segmentation evaluation at label resolution
 The system SHALL compare the U-Net with the Random Forest baseline by per-class Dice and macro Dice on the same 30 m pixels, with the Random Forest classifying each 30 m pixel from the mean of its 3x3 block of Sentinel-2 channels.
 

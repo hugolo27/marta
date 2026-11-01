@@ -58,4 +58,7 @@ Run 2026-10-21 on the M4 (MPS), `val50/`, `val10/`, `val5/results.json` and MLfl
   `37_unet_pilot.py` now records the miss (`final_split_seed` null) instead of stopping, and the
   95/5 run resumed from its six stored runs. The 80/20, 50/50 and 90/10 runs met the floor and are
   unaffected.
+- Amendment (2026-10-22, after the runs): the same train-validation proximity as in the first
+  pilot (see its amendment) applies to every share. Pilot 3 (`../unet_pilot3/README.md`) adds a
+  buffer; these results stay as the record of the split's sensitivity.
 - Time: 147 to 193 minutes of training per share.

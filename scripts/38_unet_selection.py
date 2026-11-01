@@ -1,9 +1,10 @@
 """U-Net selection, phase1-segmentation D5 (tasks 4.1-4.3). The rules are in
 data/study_area/unet_selection/README.md, above "## Results"; the split, cap, patience and RF
-sample size come from the pilot (37_unet_pilot.py).
+sample size come from pilot 3 after the third batch (37_unet_pilot.py --pilot3 --out batch3).
 
 Four steps, run in this order:
-  split       -- final split: test = every reserve block, validation = the pilot's size, best of 100 draws
+  split       -- final split: test = every reserve block, validation = the pilot's size, best of 100 draws,
+                 then the buffer of design D2
   preregister -- hashes the README's pre-registered part and logs it to MLflow before scoring
   score       -- U-Net and RF grids on validation, edge rule, comparison; resumable from results.json
   test        -- both selected models on the test tiles, once
@@ -30,7 +31,7 @@ pilot = importlib.import_module("37_unet_pilot")
 
 STUDY_DIR = Path(__file__).resolve().parents[1] / "data" / "study_area"
 OUT_DIR = STUDY_DIR / "unet_selection"
-PILOT_DIR = STUDY_DIR / "unet_pilot"
+PILOT_DIR = STUDY_DIR / "unet_pilot3" / "batch3"
 README = OUT_DIR / "README.md"
 PREREG_PATH = OUT_DIR / "preregistration.json"
 SPLIT_PATH = OUT_DIR / "final_split.json"
@@ -64,15 +65,19 @@ def balanced_split():
     closest to validation's share of all labeled cells (stratified splits, Kohavi 1995; repeated block
     allocation, Valavi et al., 2019). Cells, not the tile's center class: Dice is scored on cells, and
     tiles centered on cultivo are often mostly another class. Replaces the pilot's 10% floor, which
-    had no source."""
+    had no source. Pool tiles within the autocorrelation range of a test tile, and then training
+    tiles within it of a validation tile, are left out ("buffer")."""
     rows = dl.load_tile_manifest()
-    pool = [r for r in rows if r["group"] == "pool"]
-    n_val = min(pilot_decisions()["val_blocks_needed"] or len(pool), len({dl.tile_block(r) for r in pool}))
+    reserve = [r for r in rows if r["group"] == "reserve"]
+    pool, _ = pilot.drop_near([r for r in rows if r["group"] == "pool"], reserve)
+    n_val = pilot_decisions()["val_blocks_used"]
     best = None
     for seed in range(42, 42 + SPLIT_DRAWS):
         val_blocks = set(pilot.shuffled_blocks(pool, seed)[:n_val])
-        split = {r["path"]: "test" if r["group"] == "reserve" else "val" if dl.tile_block(r) in val_blocks else "train"
-                 for r in rows}
+        val = [r for r in pool if dl.tile_block(r) in val_blocks]
+        train, _ = pilot.drop_near([r for r in pool if dl.tile_block(r) not in val_blocks], val)
+        group = {**{r["path"]: "test" for r in reserve}, **{r["path"]: "val" for r in val}, **{r["path"]: "train" for r in train}}
+        split = {r["path"]: group.get(r["path"], "buffer") for r in rows}
         cells = {c: {g: sum(int(r[f"px_{c}"]) for r in rows if split[r["path"]] == g) for g in ("train", "val", "test")}
                  for c in dl.CLASS_NAMES}
         shares = {g: {c: cells[c][g] / sum(cells[c].values()) for c in dl.CLASS_NAMES} for g in ("val", "test")}
@@ -84,7 +89,7 @@ def balanced_split():
                     "test_gap": max(abs(s - overall["test"]) for s in shares["test"].values())}
     split = best.pop("split")
     SPLIT_PATH.write_text(json.dumps(split, indent=1))
-    best["counts"] = {g: list(split.values()).count(g) for g in ("train", "val", "test")}
+    best["counts"] = {g: list(split.values()).count(g) for g in ("train", "val", "test", "buffer")}
     (OUT_DIR / "split_stats.json").write_text(json.dumps(best, indent=2))
     print(json.dumps(best, indent=1))
 
@@ -103,35 +108,45 @@ def save(results):
     RESULTS_PATH.write_text(json.dumps(results, indent=2))
 
 
-def score_unet(cfg, data, max_epochs, patience):
-    scores, best, stop = [], [], []
+def score_unet(cfg, data, max_epochs, patience, results):
+    # Saved per seed, so an interrupted run loses at most one training (about an hour), not five
+    done = results.setdefault("seed_runs", {})
     for seed in selection.SEEDS:
+        key = f"unet_{cfg}_cap{max_epochs}_seed{seed}"
+        if key in done:
+            continue
         model, device, history = unet.train(data["train"], data["val"], seed=seed, max_epochs=max_epochs,
                                             patience=patience, verbose=False, **cfg)
-        scores.append(float(classifier_report.dice_from_counts(
-            unet.predict_counts_full(model, data["val"], device).sum(axis=0))[1]))
+        score = float(classifier_report.dice_from_counts(unet.predict_counts_full(model, data["val"], device).sum(axis=0))[1])
         best_epoch, stop_epoch = unet.epochs(history)
-        best.append(best_epoch)
-        stop.append(stop_epoch)
+        done[key] = {"score": score, "best_epoch": best_epoch, "stop_epoch": stop_epoch}
+        save(results)
         with mlflow.start_run(run_name=f"unet_{cfg}_seed{seed}", nested=True):
             mlflow.log_params({"model": "unet", "seed": seed, "max_epochs": max_epochs, "patience": patience, **cfg})
-            mlflow.log_metrics({"val_macro_dice": scores[-1], "best_epoch": best_epoch, "stop_epoch": stop_epoch})
+            mlflow.log_metrics({"val_macro_dice": score, "best_epoch": best_epoch, "stop_epoch": stop_epoch})
+    runs = [done[f"unet_{cfg}_cap{max_epochs}_seed{seed}"] for seed in selection.SEEDS]
+    best = [r["best_epoch"] for r in runs]
     near_cap = max(best) > max_epochs - CAP_MARGIN
     if near_cap and max_epochs == pilot_decisions()["max_epochs"]:
         print(f"  {cfg} best epoch near the cap, re-running with {3 * max_epochs}")
-        return score_unet(cfg, data, 3 * max_epochs, patience)
-    return selection.summarize(cfg, scores, {"max_epochs": max_epochs, "best_epoch": best, "stop_epoch": stop})
+        return score_unet(cfg, data, 3 * max_epochs, patience, results)
+    return selection.summarize(cfg, [r["score"] for r in runs],
+                               {"max_epochs": max_epochs, "best_epoch": best, "stop_epoch": [r["stop_epoch"] for r in runs]})
 
 
-def score_rf(cfg, data, max_samples):
-    scores = []
+def score_rf(cfg, data, max_samples, results):
+    done = results.setdefault("seed_runs", {})
     for seed in selection.SEEDS:
+        key = f"rf_{cfg}_seed{seed}"
+        if key in done:
+            continue
         rf = train_rf.train_tiles(data["train"], seed=seed, max_samples=max_samples, **cfg)
-        scores.append(float(classifier_report.dice_from_counts(train_rf.predict_counts_tiles(rf, data["val"]).sum(axis=0))[1]))
+        done[key] = {"score": float(classifier_report.dice_from_counts(train_rf.predict_counts_tiles(rf, data["val"]).sum(axis=0))[1])}
+        save(results)
         with mlflow.start_run(run_name=f"rf_{cfg}_seed{seed}", nested=True):
             mlflow.log_params({"model": "rf", "seed": seed, "max_samples": max_samples, **{k: str(v) for k, v in cfg.items()}})
-            mlflow.log_metric("val_macro_dice", scores[-1])
-    return selection.summarize(cfg, scores)
+            mlflow.log_metric("val_macro_dice", done[key]["score"])
+    return selection.summarize(cfg, [done[f"rf_{cfg}_seed{seed}"]["score"] for seed in selection.SEEDS])
 
 
 def run_grid(name, configs, scorer, results):
@@ -160,9 +175,9 @@ def score():
     with mlflow.start_run(run_name="selection"):
         print("Random Forest grid (val)")
         rf_rows = run_grid("rf", selection.grid(selection.RF_GRID),
-                           lambda cfg: score_rf(cfg, data, pilot["rf_max_samples"]), results)
+                           lambda cfg: score_rf(cfg, data, pilot["rf_max_samples"], results), results)
         print("U-Net grid (val)")
-        unet_scorer = lambda cfg: score_unet(cfg, data, pilot["max_epochs"], patience)
+        unet_scorer = lambda cfg: score_unet(cfg, data, pilot["max_epochs"], patience, results)
         rows = run_grid("unet", selection.grid(UNET_GRID), unet_scorer, results)
         tie = lambda r: (r["config"]["tile_px"], -r["config"]["batch_size"])
         chosen = best(rows, tie)["config"]

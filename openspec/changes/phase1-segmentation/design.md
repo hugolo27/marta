@@ -43,7 +43,8 @@ See proposal.md. Current state (phase1-dataset-v2): 5,993 patches of 33x33x26 wi
 
 ### D2. Splits
 - Final split (after the pilot): test = every reserve block, validation = the pilot's size in pool blocks, rest training. Of 100 random draws (blockCV's default, Valavi et al., 2019), the one whose share of each class's labeled 30 m cells in validation is closest to validation's share of all labeled cells (stratification, Kohavi, 1995; cells rather than center class, since Dice is scored on cells). Replaces a "10% of each class" floor that had no source.
-- Same 6 km blocks, assigned regardless of class. The minimum distance between tiles of different splits becomes the tile diagonal (192 px: 2.7 km), so no two tiles of different splits share ground.
+- Same 6 km blocks, assigned regardless of class. When the tiles are built, a pool point within the tile diagonal (192 px: 2.7 km) of a reserve point is dropped; nothing kept training and validation tiles apart, and in the first pilot 75 pairs had centers closer than 2.7 km.
+- **Buffer** (from pilot 3 on): a tile is left out if any of its pixels lies within the autocorrelation range of a tile of a split it must be kept apart from (Roberts et al., 2017): first pool tiles near the test reserve, then, after validation is drawn, training tiles near validation. Range = the largest practical range of the four semivariograms, 5,161 m (95% of the sill, the largest as for the block side). Distance edge to edge between footprints, corners moved to UTM 21S. With 6 km blocks it costs a lot: of 3,165 pool tiles, 727 go near the reserve and 384 more near a 20% validation.
 - The split proportions come from the pilot (D4), not from 70/15/15.
 
 ### D3. Model and metric
@@ -63,6 +64,8 @@ See proposal.md. Current state (phase1-dataset-v2): 5,993 patches of 33x33x26 wi
 - The pilot's models are discarded. Its rule is written and hashed before it runs: `data/study_area/unet_pilot/README.md`.
 - **Sensitivity of the provisional split (pilot 2).** The 80/20 has no source, so the pilot's runs and decisions (seed noise, patience, split sizes, learning curve) are repeated with 50/50, 90/10 and 95/5 on the same 1,940 tiles. The four ratios are the fold counts Kohavi (1995) compares (k = 2, 5, 10, 20); 80/20 is also blockCV's default k = 5 (Valavi et al., 2019). If the decisions do not change, the 80/20 result stands; if they do, the spread is reported. Rule written and hashed before it runs: `data/study_area/unet_pilot_sensitivity/README.md`.
 - **Tile count.** 2,000 tiles (about 2 million labeled cells at 96 px) was a starting point, not a sourced value: the number is set by measurement, with the learning curve (Ning et al., 2020). The curve still climbed (+0.009 > `s` from 75% to 100%), so a second batch of about 2,000 doubles it and the curve is measured again, together with the validation size (the same block bootstrap on the curve's 100% runs, since blocks will hold more tiles); doubling is a convention, since an inverse power law fit (Figueroa et al., 2012) found no plateau to extrapolate to.
+
+- **Pilot 3.** The second batch and the buffer change the data the first pilot measured on, and two fixes changed the metric (absent classes left out of macro Dice, validation on the whole tile). Pilot 3 repeats the runs and rules on all tiles with the buffer. Rule 4's validation size is capped at the provisional validation's blocks, so the selection never trains on fewer tiles than the pilot measured its rules on (a convention). If the curve still climbs, at most one more batch, then the selection goes ahead and the curve is reported as a limitation. Its README also fixes the rules of the final split, the selection and the test, so nothing after it is designed on a result: `data/study_area/unet_pilot3/README.md`.
 
 ### D5. Selection (pre-registered)
 - Grid: tile {48, 96, 192} × `lr` {0.0001, 0.0003, 0.001} × batch {8, 16, 32}, 5 seeds (42, 1, 7, 123, 2026), `ddof=1`. Selected configuration: highest mean validation macro Dice; ties go to the smaller tile, then the larger batch.
@@ -95,6 +98,7 @@ See proposal.md. Current state (phase1-dataset-v2): 5,993 patches of 33x33x26 wi
 - Kohavi, R. (1995). A study of cross-validation and bootstrap for accuracy estimation and model selection. IJCAI 14, 1137-1145. https://mlanthology.org/ijcai/1995/kohavi1995ijcai-study
 - Milletari, F., et al. (2016). V-Net. 3DV, 565-571. https://doi.org/10.1109/3DV.2016.79
 - Ning, H., et al. (2020). Choosing an appropriate training set size. Annals of GIS 26(4), 329-342. https://doi.org/10.1080/19475683.2020.1803402
+- Roberts, D. R., et al. (2017). Cross-validation strategies for data with temporal, spatial, hierarchical, or phylogenetic structure. Ecography 40(8), 913-929. https://doi.org/10.1111/ecog.02881
 - Prechelt, L. (1998). Early stopping - but when? LNCS 1524, 55-69. https://doi.org/10.1007/3-540-49430-8_3
 - Ronneberger, O., et al. (2015). U-Net. MICCAI, 234-241. https://doi.org/10.1007/978-3-319-24574-4_28
 - Valavi, R., et al. (2019). blockCV. Methods in Ecology and Evolution 10(2), 225-232. https://doi.org/10.1111/2041-210X.13107

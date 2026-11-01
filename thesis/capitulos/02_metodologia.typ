@@ -160,17 +160,36 @@ cerca de la proporción general, es decir, una partición estratificada por clas
 @kohavi1995study. Se cuentan celdas y no la clase del centro del recorte, porque el Dice se
 calcula sobre celdas y un recorte centrado en cultivo suele ser en su mayoría otra clase.
 
-*Pendiente: sensibilidad del piloto y segunda tanda.* La proporción 80/20 con la que el piloto
-separó entrenamiento y validación no tiene fuente. Por eso el piloto se repite con 50/50, 90/10
-y 95/5 sobre los mismos recortes: son, junto con 80/20, las particiones en 2, 5, 10 y 20 partes
-que compara #cite(<kohavi1995study>, form: "prose"). Si las decisiones no cambian, el resultado
-del piloto se mantiene; si cambian, se informa cuánto. La cantidad inicial de 2.000 recortes
-tampoco tiene fuente: fue un punto de partida, y la cantidad se fija midiendo con la curva de
-aprendizaje @ning2020training. Como la curva siguió subiendo, se descarga una segunda tanda de
-unos 2.000 recortes y se vuelve a medir, junto con el tamaño de validación: los 390 bloques
-se midieron con unos 2 recortes por bloque, y con más recortes cada bloque da una nota más
-estable, así que podrían alcanzar menos. El Random Forest a 30 m llegó a
-0,821 con 25.000 celdas por árbol, cerca de la mejor U-Net del piloto (0,827).
+*Sensibilidad del piloto y segunda tanda.* La proporción 80/20 con la que el piloto separó
+entrenamiento y validación no tiene fuente. Por eso el piloto se repitió con 50/50, 90/10 y 95/5
+sobre los mismos recortes: son, junto con 80/20, las particiones en 2, 5, 10 y 20 partes que
+compara #cite(<kohavi1995study>, form: "prose"). Las cuatro dicen que faltan recortes; la
+paciencia (17 a 24), el tope de épocas (100 o 300) y la muestra del Random Forest (25.000 a
+200.000 celdas) se mueven, así que se mantienen las del 80/20 y se informa el rango. La cantidad
+inicial de 2.000 recortes tampoco tenía fuente: se fija midiendo con la curva de aprendizaje
+@ning2020training. Se descargó una segunda tanda y hoy hay 3.852 recortes, 687 de ellos en la
+reserva de test (333 bloques). El Random Forest a 30 m llegó a 0,821 con 25.000 celdas por
+árbol, cerca de la mejor U-Net del piloto (0,827).
+
+*Separación entre particiones.* Los bloques de 6 km evitan que un mismo bloque caiga en dos
+particiones, pero dos recortes de bloques vecinos pueden quedar a menos del alcance de la
+autocorrelación. En el primer piloto, 75 pares de recortes de entrenamiento y validación tenían
+sus centros a menos de 2,7 km, así que podían compartir terreno. Desde el tercer piloto se deja
+afuera todo recorte que tenga algún píxel a menos de 5.161 m (el mayor alcance medido en los
+semivariogramas) de un recorte de otra partición @roberts2017crossvalidation: primero los del
+resto cerca de test y, después de sortear validación, los de entrenamiento cerca de validación.
+Cuesta caro: de 3.165 recortes fuera de test quedan 1.552 para entrenar y 502 para validar.
+
+*Tercer piloto y reglas congeladas.* El tercer piloto repite el primero con todos los recortes,
+con la separación anterior y con dos correcciones del código (una clase ausente de la referencia
+y de la predicción ya no suma un Dice de 1, y validación se mide sobre el recorte entero). Como
+cada piloto ajustó el diseño del siguiente, su documento registrado fija de una vez todas las
+reglas que quedan: la partición final, la selección y el test. Un cambio posterior pasa a ser
+una enmienda con fecha. Dos de esas reglas son convenciones declaradas. El tamaño de validación
+no puede superar el del piloto (229 bloques), porque con la separación una validación más
+grande le quita recortes al entrenamiento y la selección entrenaría con menos datos de los que
+usó el piloto para medir sus reglas. Si la curva sigue subiendo, se descarga a lo sumo una
+tanda más, y después se sigue igual y se informa como limitación.
 
 == Detección de cambio y evaluación de exactitud
 

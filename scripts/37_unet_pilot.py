@@ -10,7 +10,11 @@ Pilot 2 (task 3.3) repeats it with another provisional validation share: --val-s
 0.05 reads the README in data/study_area/unet_pilot_sensitivity/ and writes to a subfolder per share.
 Both pilots read only the first batch of tiles.
 
-Usage: .venv/bin/python scripts/37_unet_pilot.py preregister|run [--val-share X]"""
+Pilot 3 (task 3.5), --pilot3: the same runs on every batch, with the buffer of design D2 and the
+rules changed in data/study_area/unet_pilot3/README.md; the final split is left to 38 split. After
+a third batch of tiles it runs again under the same README with --out batch3.
+
+Usage: .venv/bin/python scripts/37_unet_pilot.py preregister|run [--val-share X | --pilot3 [--out batch3]]"""
 
 import argparse
 import hashlib
@@ -53,6 +57,7 @@ VAL_SHARE_PILOT = 0.20
 FRACTIONS = [0.25, 0.5, 0.75, 1.0]
 RF_SAMPLES = [25000, 50000, 100000, 200000, 400000]
 MIN_EVAL_SHARE = 0.10
+PILOT3 = False
 
 
 def preregistered_text():
@@ -84,6 +89,11 @@ def provisional_split(pool):
     return train, val
 
 
+def drop_near(rows, targets):
+    near = dl.tiles_near(rows, targets, dl.autocorrelation_range_m())
+    return [r for r in rows if r["path"] not in near], len(near)
+
+
 def save(results):
     RESULTS_PATH.write_text(json.dumps(results, indent=2))
 
@@ -94,7 +104,7 @@ def unet_run(key, results, train_rows, val_rows, lr, seed, max_epochs, patience=
     start = time.time()
     model, device, history = unet.train(train_rows, val_rows, tile_px=TILE_PX, lr=lr, batch_size=BATCH_SIZE, seed=seed,
                                         max_epochs=max_epochs, patience=patience, verbose=False)
-    counts = unet.predict_counts(model, val_rows, device)
+    counts = (unet.predict_counts_full if PILOT3 else unet.predict_counts)(model, val_rows, device)
     np.save(OUT_DIR / f"counts_{key}.npy", counts)
     best_epoch, stop_epoch = unet.epochs(history)
     row = {"lr": lr, "seed": seed, "n_train": len(train_rows), "history": history, "best_epoch": best_epoch,
@@ -143,9 +153,13 @@ def block_counts(counts, rows):
     return out
 
 
-def bootstrap_spread(per_block, n, rng, other=None):
+def bootstrap_spread(per_block, n, rng, other=None, missing=None):
     idx = rng.integers(0, len(per_block), size=(N_BOOTSTRAP, n))
-    macro = classifier_report.dice_from_counts(per_block[idx].sum(axis=1))[1]
+    sums = per_block[idx].sum(axis=1)
+    if missing is not None:
+        # Draws with no labeled cell of some class: their macro Dice averages the other classes
+        missing[n] = missing.get(n, 0) + int(np.any(sums[..., 2] == 0, axis=-1).sum())
+    macro = classifier_report.dice_from_counts(sums)[1]
     if other is not None:
         macro = macro - classifier_report.dice_from_counts(other[idx].sum(axis=1))[1]
     return float(np.std(macro, ddof=1))
@@ -177,17 +191,23 @@ def final_split(pool, reserve, n_val, n_test):
 def run():
     if hashlib.sha256(preregistered_text().encode()).hexdigest() != json.loads(PREREG_PATH.read_text())["sha256"]:
         sys.exit("README changed since pre-registration")
-    manifest = [r for r in dl.load_tile_manifest() if r["batch"] == "1"]
+    manifest = [r for r in dl.load_tile_manifest() if PILOT3 or r["batch"] == "1"]
     pool = [r for r in manifest if r["group"] == "pool"]
     reserve = [r for r in manifest if r["group"] == "reserve"]
+    near_test = near_val = 0
+    if PILOT3:
+        pool, near_test = drop_near(pool, reserve)
     train_rows, val_rows = provisional_split(pool)
+    if PILOT3:
+        train_rows, near_val = drop_near(train_rows, val_rows)
     results = json.loads(RESULTS_PATH.read_text()) if RESULTS_PATH.exists() else {"runs": {}}
     results["provisional"] = {"train_tiles": len(train_rows), "val_tiles": len(val_rows),
-                              "val_blocks": len({dl.tile_block(r) for r in val_rows})}
+                              "val_blocks": len({dl.tile_block(r) for r in val_rows}),
+                              "dropped_near_reserve": near_test, "dropped_near_val": near_val}
     print(f"pool {len(pool)} tiles: provisional train {len(train_rows)}, val {len(val_rows)}")
 
     mlflow.set_experiment(EXPERIMENT_NAME)
-    with mlflow.start_run(run_name=f"pilot_val{round(VAL_SHARE_PILOT * 100)}"):
+    with mlflow.start_run(run_name=f"pilot_val{round(VAL_SHARE_PILOT * 100)}" + (f"_{OUT_DIR.name}" if PILOT3 and OUT_DIR != PILOT_DIR else "")):
         for lr in LRS:
             for seed in SEEDS:
                 unet_run(f"lr{lr}_seed{seed}", results, train_rows, val_rows, lr, seed, MAX_EPOCHS)
@@ -200,23 +220,32 @@ def run():
 
         rng = np.random.default_rng(42)
         per_block = {k: block_counts(np.load(OUT_DIR / f"counts_{k}.npy"), val_rows) for k in sum(keys.values(), [])}
-        test_spread = {n: float(np.mean([bootstrap_spread(b, n, rng) for b in per_block.values()])) for n in SIZES}
+        missing = {} if PILOT3 else None
+        test_spread = {n: float(np.mean([bootstrap_spread(b, n, rng, missing=missing) for b in per_block.values()])) for n in SIZES}
         pairs = [(f"lr{a}_seed{seed}", f"lr{b}_seed{seed}") for a, b in zip(LRS, LRS[1:]) for seed in SEEDS]
         val_spread = {n: float(np.mean([bootstrap_spread(per_block[a], n, rng, per_block[b]) for a, b in pairs])) for n in SIZES}
         n_test, n_val = smallest_size(test_spread, s), smallest_size(val_spread, s)
         avail_test, avail_val = len({dl.tile_block(r) for r in reserve}), len({dl.tile_block(r) for r in pool})
         n_test_used = min(n_test or avail_test, avail_test)
+        if PILOT3:
+            # Rule 4 cap: the selection trains on no fewer tiles than the pilot measured its rules on
+            avail_val = results["provisional"]["val_blocks"]
         n_val_used = min(n_val or avail_val, avail_val)
-        split, split_seed, shares = final_split(pool, reserve, n_val_used, n_test_used)
-        (OUT_DIR / "final_split.json").write_text(json.dumps(split, indent=1))
         results["decisions"] = {
             "seed_std": s, "max_epochs": cap, "patience": patience,
             "test_spread": test_spread, "val_spread": val_spread,
             "test_blocks_needed": n_test, "val_blocks_needed": n_val,
             "test_blocks_used": n_test_used, "val_blocks_used": n_val_used,
-            "final_split_seed": split_seed, "final_eval_shares": shares,
-            "final_counts": {g: list(split.values()).count(g) for g in ("train", "val", "test")},
         }
+        if PILOT3:
+            results["decisions"]["draws_missing_a_class"] = {n: missing[n] for n in SIZES}
+        else:
+            split, split_seed, shares = final_split(pool, reserve, n_val_used, n_test_used)
+            (OUT_DIR / "final_split.json").write_text(json.dumps(split, indent=1))
+            results["decisions"].update({
+                "final_split_seed": split_seed, "final_eval_shares": shares,
+                "final_counts": {g: list(split.values()).count(g) for g in ("train", "val", "test")},
+            })
         save(results)
         print(json.dumps({k: v for k, v in results["decisions"].items() if "spread" not in k}, indent=1), flush=True)
 
@@ -254,6 +283,18 @@ def run():
         print(json.dumps({k: v for k, v in results["decisions"].items() if "spread" not in k}, indent=1))
 
 
+def configure_pilot3(out=None):
+    global PILOT_DIR, OUT_DIR, README, PREREG_PATH, RESULTS_PATH, EXPERIMENT_NAME, PILOT3
+    PILOT_DIR = STUDY_DIR / "unet_pilot3"
+    OUT_DIR = PILOT_DIR / out if out else PILOT_DIR
+    OUT_DIR.mkdir(exist_ok=True)
+    README = PILOT_DIR / "README.md"
+    PREREG_PATH = PILOT_DIR / "preregistration.json"
+    RESULTS_PATH = OUT_DIR / "results.json"
+    EXPERIMENT_NAME = "phase1-unet-pilot3"
+    PILOT3 = True
+
+
 def configure(val_share):
     global PILOT_DIR, OUT_DIR, README, PREREG_PATH, RESULTS_PATH, EXPERIMENT_NAME, VAL_SHARE_PILOT
     PILOT_DIR = STUDY_DIR / "unet_pilot_sensitivity"
@@ -270,7 +311,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("step", choices=["preregister", "run"])
     parser.add_argument("--val-share", type=float)
+    parser.add_argument("--pilot3", action="store_true")
+    parser.add_argument("--out")
     args = parser.parse_args()
     if args.val_share:
         configure(args.val_share)
+    if args.pilot3:
+        configure_pilot3(args.out)
     {"preregister": preregister, "run": run}[args.step]()

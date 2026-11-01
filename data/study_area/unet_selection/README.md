@@ -2,18 +2,24 @@
 
 Pre-registered after the pilot and before any configuration is scored: everything above
 "## Results" is hashed and logged to MLflow (`phase1-unet-selection`), and
-`scripts/38_unet_selection.py` refuses to score if it changed.
+`scripts/38_unet_selection.py` refuses to score if it changed. Its rules were already fixed by
+pilot 3's pre-registration (`../unet_pilot3/README.md`, "Rules fixed now"); this README only
+restates them.
 
 ## Inputs fixed by the pilot
 
-From `data/study_area/unet_pilot/results.json` ("decisions"): the validation size in 6 km blocks,
+From `data/study_area/unet_pilot3/batch3/results.json` ("decisions", pilot 3 after the third batch): the validation size in 6 km blocks
+(rule 4, capped at the provisional validation's blocks),
 the epoch cap, the early-stopping patience and the Random Forest's per-tree sample size. Nothing
 else from the pilot is reused; its models were discarded.
 
 ## Split
 
 `38_unet_selection.py split`, run before this README is hashed: test = every block of the reserve;
-validation = the pilot's validation size in blocks of the pool; the rest is training. 100 random
+pool tiles within the autocorrelation range (5,161 m, edge to edge) of a test tile are left out;
+validation = the pilot's validation size in blocks of the remaining pool; training tiles within
+that range of a validation tile are left out; the rest is training. Tiles left out are marked
+"buffer" and used by no step (Roberts et al., 2017; design D2). 100 random
 draws of the validation blocks (seeds 42 to 141; 100 is blockCV's default number of allocations,
 Valavi et al., 2019); the draw kept is the one whose share of each class's labeled cells (30 m) in
 validation is closest to validation's share of all labeled cells, so validation is stratified by
@@ -26,8 +32,8 @@ which had no source. Output: `final_split.json` and `split_stats.json` in this f
 ## U-Net
 
 - Grid: tile {48, 96, 192} px × `lr` {0.0001, 0.0003, 0.001} × batch {8, 16, 32}, 5 seeds (42, 1,
-  7, 123, 2026), `ddof=1`. Early stopping on validation macro Dice with the pilot's patience; best
-  weights kept.
+  7, 123, 2026), `ddof=1`. Early stopping on validation macro Dice, scored on the whole 192 px
+  tiles, with the pilot's patience; best weights kept.
 - Every configuration is scored on the whole 192 px validation tiles at 30 m, by windows of its own
   tile size with half-window overlap, so all configurations and the Random Forest are scored on
   the same cells.
@@ -57,6 +63,7 @@ which had no source. Output: `final_split.json` and `split_stats.json` in this f
   operational follows the requirement "Operational classifier selection" of the
   `land-cover-classifier` spec.
 - Test: both selected models are scored once on the test tiles, after the decision, and the result
-  is used for nothing else.
+  is used for nothing else. The U-Net is trained with the epoch cap its selection ended with (3
+  times the pilot's if it was re-run near the cap).
 
 ## Results

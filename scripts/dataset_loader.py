@@ -3,6 +3,7 @@
 and a patch tensor dataset for the CNN."""
 
 import csv
+import json
 from functools import lru_cache
 from pathlib import Path
 
@@ -94,6 +95,8 @@ TILES_DIR = REPO_ROOT / "data" / "study_area" / "tiles"
 TILE_NDVI_SCALE = 10000
 TILE_NDVI_CHANNELS = [12, 25]
 IGNORE = -1
+TILE_M = 192 * 10
+AUTOCORRELATION_PATH = REPO_ROOT / "data" / "study_area" / "spatial_autocorrelation" / "results.json"
 
 
 @lru_cache(maxsize=None)
@@ -106,6 +109,31 @@ def tile_block(row):
     """The 6 km block of a tile, so callers split by block (08_assemble_dataset.block_key)."""
     import importlib
     return importlib.import_module("08_assemble_dataset").block_key(float(row["lon"]), float(row["lat"]))
+
+
+def autocorrelation_range_m():
+    """The largest practical range of the four semivariograms (33_spatial_autocorrelation.py), the
+    same value the 6 km block side was rounded up from."""
+    fits = json.loads(AUTOCORRELATION_PATH.read_text())
+    return max(fits[y]["fits"][v]["practical_range_m"] for y in ("2019", "2023") for v in ("ndvi", "class"))
+
+
+def tiles_near(rows, targets, distance):
+    """Paths of the tiles in rows whose footprint comes within distance (m) of any target tile's
+    footprint, edge to edge (phase1-segmentation D2 buffer). Footprints are drawn in each tile's own
+    UTM zone and their corners moved to 21S, since the area spans 20S and 21S."""
+    from pyproj import Transformer
+    from shapely import STRtree, box
+    from shapely.ops import transform
+
+    to_21s = {e: Transformer.from_crs(f"EPSG:{e}", "EPSG:32721", always_xy=True).transform for e in ("32720", "32721")}
+
+    def footprint(r):
+        x0, y0 = float(r["x0"]), float(r["y0"])
+        return transform(to_21s[r["epsg"]], box(x0, y0 - TILE_M, x0 + TILE_M, y0))
+
+    tree = STRtree([footprint(r) for r in targets])
+    return {r["path"] for r in rows if len(tree.query(footprint(r), predicate="dwithin", distance=distance))}
 
 
 @lru_cache(maxsize=None)
