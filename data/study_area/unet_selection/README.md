@@ -34,6 +34,11 @@ which had no source. Output: `final_split.json` and `split_stats.json` in this f
 - Grid: tile {48, 96, 192} px × `lr` {0.0001, 0.0003, 0.001} × batch {8, 16, 32}, 5 seeds (42, 1,
   7, 123, 2026), `ddof=1`. Early stopping on validation macro Dice, scored on the whole 192 px
   tiles, with the pilot's patience; best weights kept.
+- Training draws one window of the configuration's tile size per tile and epoch, anywhere on the
+  tile's 30 m grid, with channel statistics over the whole training tiles, so every tile size
+  trains on all the labeled cells of the training tiles and the grid compares context, not amount
+  of data (nnU-Net samples its training patches the same way, Isensee et al., 2021). The pilots
+  trained on the 96 px center crop; their patience and epoch cap are reused as measured.
 - Every configuration is scored on the whole 192 px validation tiles at 30 m, by windows of its own
   tile size with half-window overlap, so all configurations and the Random Forest are scored on
   the same cells.
@@ -42,13 +47,16 @@ which had no source. Output: `final_split.json` and `split_stats.json` in this f
 - Edge rule, once: if the selected `lr` is 0.0001 or 0.001, 0.00003 or 0.003 is added; if the
   selected batch is 8 or 32, 4 or 64 is added; each with the other two values fixed at the
   selection, and the selection is redone. Tile 48 cannot go lower (fewer than 4 px at the bottom
-  level). If tile 192 is selected, tiles of 288 px are extracted and that value is added. Basis:
+  level). If tile 192 is still selected after that, scoring stops before the selection is saved:
+  tiles of 288 px are extracted around the same centers, the buffer is recomputed on their
+  footprints (tiles it drops are left out of the 288 px runs only, and counted), the 288 px
+  configuration is scored on the same 192 px cells as the others, and that value is added. Basis:
   a best value at the boundary of the search space suggests a better one beyond it (Godbole et
   al., 2023, Deep Learning Tuning Playbook, Google Research; a practitioner guide, not peer
   reviewed). The step size repeats the grid's own spacing (x3 for `lr`, x2 for batch) and is our
   convention.
-- A configuration whose best epoch is within 10 epochs of the cap in any seed is re-run with three
-  times the cap.
+- A configuration whose best epoch is within 10 epochs of the cap in any seed (epoch 90 or later
+  with a cap of 100) is re-run with three times the cap.
 
 ## Random Forest
 

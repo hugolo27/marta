@@ -114,31 +114,33 @@ def predict_counts(model, rows, device, batch_size=16):
     return np.stack(counts)
 
 
-def predict_full(model, image, device):
-    """30 m probabilities over a whole 192 px tile, (3, 64, 64), by windows of the model's tile size
+def predict_full(model, images, device):
+    """30 m probabilities over whole 192 px tiles, (N, 3, 64, 64), by windows of the model's tile size
     with half-window overlap, averaged (as nnU-Net does). Every window edge stays on the 30 m grid.
     Scoring every configuration on the whole tile puts all of them, and RF, on the same cells."""
     size, step = model.tile_px, model.tile_px // 2
-    full = image.shape[-1]
-    total = torch.zeros(N_CLASSES, full // 3, full // 3)
-    weight = torch.zeros(full // 3, full // 3)
+    full = images.shape[-1]
     starts = list(range(0, full - size + 1, step))
-    windows = torch.stack([image[:, r:r + size, c:c + size] for r in starts for c in starts])
+    spots = [(r, c) for r in starts for c in starts]
+    windows = torch.stack([images[:, :, r:r + size, c:c + size] for r, c in spots], dim=1).flatten(0, 1)
     with torch.no_grad():
-        probs = probs_30m(model(windows.to(device))).cpu()
-    for p, (r, c) in zip(probs, [(r, c) for r in starts for c in starts]):
-        total[:, r // 3:(r + size) // 3, c // 3:(c + size) // 3] += p
+        probs = probs_30m(model(windows.to(device))).cpu().unflatten(0, (len(images), len(spots)))
+    total = torch.zeros(len(images), N_CLASSES, full // 3, full // 3)
+    weight = torch.zeros(full // 3, full // 3)
+    for i, (r, c) in enumerate(spots):
+        total[:, :, r // 3:(r + size) // 3, c // 3:(c + size) // 3] += probs[:, i]
         weight[r // 3:(r + size) // 3, c // 3:(c + size) // 3] += 1
     return total / weight
 
 
-def predict_counts_full(model, rows, device):
-    """classifier_report.dice_counts per whole 192 px tile, (N, 3, 3)."""
+def predict_counts_full(model, rows, device, batch_size=8):
+    """classifier_report.dice_counts per whole 192 px tile, (N, 3, 3). Several tiles per forward
+    pass; instance normalization works per window, so batching does not change the predictions."""
     model.eval()
     counts = []
-    for image, label in dl.TileDataset(rows, 192):
-        pred = predict_full(model, image, device).argmax(0).numpy()
-        counts.append(classifier_report.dice_counts(pred, label.numpy()))
+    for images, labels in DataLoader(dl.TileDataset(rows, 192), batch_size=batch_size):
+        pred = predict_full(model, images, device).argmax(1).numpy()
+        counts += [classifier_report.dice_counts(p, l) for p, l in zip(pred, labels.numpy())]
     return np.stack(counts)
 
 
@@ -149,18 +151,21 @@ def evaluate(model, rows, device):
 
 
 def train(train_rows, val_rows, tile_px=96, lr=0.0003, batch_size=16, seed=42, max_epochs=MAX_EPOCHS, patience=None,
-          verbose=True):
+          verbose=True, random_window=False):
     """patience=None trains to max_epochs (the pilot). Keeps the weights of the best validation
-    macro Dice. Returns the model, the device and the per-epoch history."""
+    macro Dice. Returns the model, the device and the per-epoch history. random_window (the
+    selection) trains on windows drawn anywhere on the tile, with channel statistics over the whole
+    tiles; the pilots trained on the center crop."""
     seed_everything(seed)
     device = device_name()
     model = UNet(tile_px)
-    mean, std = dl.tile_channel_stats(train_rows, tile_px)
+    mean, std = dl.tile_channel_stats(train_rows, 192 if random_window else tile_px)
     model.mean.copy_(torch.from_numpy(mean))
     model.std.copy_(torch.from_numpy(std))
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    loader = DataLoader(dl.TileDataset(train_rows, tile_px, augment=True), batch_size=batch_size, shuffle=True, drop_last=True)
+    loader = DataLoader(dl.TileDataset(train_rows, tile_px, augment=True, random_window=random_window),
+                        batch_size=batch_size, shuffle=True, drop_last=True)
 
     history = {"train_loss": [], "val_macro_dice": []}
     best, best_state, since_best = -math.inf, None, 0

@@ -147,13 +147,14 @@ def _load_full_tile(path):
     return image, label
 
 
-def load_tile(path, tile_px=192):
-    """Center crop of a tile as int16 image (H, W, 26) and int64 label (H/3, W/3). The crop keeps
-    the 3x3 alignment: tiles are 192 px and the allowed sizes are multiples of 48."""
+def load_tile(path, tile_px=192, offset=None):
+    """Crop of a tile as int16 image (H, W, 26) and int64 label (H/3, W/3), at the center unless an
+    (row, col) offset in 10 m pixels is given. Offsets are multiples of 3 so the crop keeps the 3x3
+    alignment: tiles are 192 px and the allowed sizes are multiples of 48."""
     image, label = _load_full_tile(path)
-    offset = (image.shape[0] - tile_px) // 2
-    return (image[offset:offset + tile_px, offset:offset + tile_px],
-            label[offset // 3:(offset + tile_px) // 3, offset // 3:(offset + tile_px) // 3])
+    r, c = offset or ((image.shape[0] - tile_px) // 2,) * 2
+    return (image[r:r + tile_px, c:c + tile_px],
+            label[r // 3:(r + tile_px) // 3, c // 3:(c + tile_px) // 3])
 
 
 def tile_to_float(image):
@@ -165,21 +166,27 @@ def tile_to_float(image):
 def tile_channel_stats(rows, tile_px=192):
     """Per-channel mean and standard deviation over the pixels of the given (training) tiles, in two
     passes (one formula with E[x^2] - mean^2 can cancel to a negative variance). Pixels with a gap
-    in either composite are left out: their zeros would pull the mean down and inflate the std."""
-    def pixels(row):
-        image = tile_to_float(load_tile(row["path"], tile_px)[0]).reshape(-1, 26).astype(np.float64)
+    in either composite are left out: their zeros would pull the mean down and inflate the std.
+    Cached, since the selection trains every configuration and seed on the same tiles."""
+    return _channel_stats(tuple(r["path"] for r in rows), tile_px)
+
+
+@lru_cache(maxsize=None)
+def _channel_stats(paths, tile_px):
+    def pixels(path):
+        image = tile_to_float(load_tile(path, tile_px)[0]).reshape(-1, 26).astype(np.float64)
         gap = np.all(image.reshape(-1, 2, 13) == 0, axis=-1).any(axis=-1)
         return image[~gap]
 
     total, n = np.zeros(26), 0
-    for row in rows:
-        image = pixels(row)
+    for path in paths:
+        image = pixels(path)
         total += image.sum(axis=0)
         n += len(image)
     mean = total / n
     total_sq = np.zeros(26)
-    for row in rows:
-        total_sq += ((pixels(row) - mean) ** 2).sum(axis=0)
+    for path in paths:
+        total_sq += ((pixels(path) - mean) ** 2).sum(axis=0)
     return mean.astype(np.float32), np.sqrt(total_sq / n).astype(np.float32)
 
 
@@ -197,18 +204,26 @@ def block_features(rows, tile_px=192):
 
 
 class TileDataset(Dataset):
-    """Tiles channel-first, with the 30 m label map; rotations and flips move both together."""
+    """Tiles channel-first, with the 30 m label map; rotations and flips move both together.
+    random_window draws the crop anywhere on the tile's 30 m grid instead of the center, so a
+    smaller tile size still trains on every labeled cell over the epochs (nnU-Net samples its
+    training patches the same way, Isensee et al., 2021)."""
 
-    def __init__(self, rows, tile_px=192, augment=False):
+    def __init__(self, rows, tile_px=192, augment=False, random_window=False):
         self.rows = rows
         self.tile_px = tile_px
         self.augment = augment
+        self.random_window = random_window
 
     def __len__(self):
         return len(self.rows)
 
     def __getitem__(self, idx):
-        image, label = load_tile(self.rows[idx]["path"], self.tile_px)
+        offset = None
+        if self.random_window:
+            positions = (192 - self.tile_px) // 3 + 1
+            offset = (3 * np.random.randint(positions), 3 * np.random.randint(positions))
+        image, label = load_tile(self.rows[idx]["path"], self.tile_px, offset)
         image = tile_to_float(image)
         if self.augment:
             k = np.random.randint(4)

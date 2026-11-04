@@ -115,9 +115,10 @@ def score_unet(cfg, data, max_epochs, patience, results):
         key = f"unet_{cfg}_cap{max_epochs}_seed{seed}"
         if key in done:
             continue
-        model, device, history = unet.train(data["train"], data["val"], seed=seed, max_epochs=max_epochs,
-                                            patience=patience, verbose=False, **cfg)
-        score = float(classifier_report.dice_from_counts(unet.predict_counts_full(model, data["val"], device).sum(axis=0))[1])
+        # train() keeps the best epoch's weights, so its validation score is already in the history
+        _, _, history = unet.train(data["train"], data["val"], seed=seed, max_epochs=max_epochs, patience=patience,
+                                   verbose=False, random_window=True, **cfg)
+        score = max(history["val_macro_dice"])
         best_epoch, stop_epoch = unet.epochs(history)
         done[key] = {"score": score, "best_epoch": best_epoch, "stop_epoch": stop_epoch}
         save(results)
@@ -126,7 +127,7 @@ def score_unet(cfg, data, max_epochs, patience, results):
             mlflow.log_metrics({"val_macro_dice": score, "best_epoch": best_epoch, "stop_epoch": stop_epoch})
     runs = [done[f"unet_{cfg}_cap{max_epochs}_seed{seed}"] for seed in selection.SEEDS]
     best = [r["best_epoch"] for r in runs]
-    near_cap = max(best) > max_epochs - CAP_MARGIN
+    near_cap = max(best) >= max_epochs - CAP_MARGIN
     if near_cap and max_epochs == pilot_decisions()["max_epochs"]:
         print(f"  {cfg} best epoch near the cap, re-running with {3 * max_epochs}")
         return score_unet(cfg, data, 3 * max_epochs, patience, results)
@@ -168,24 +169,26 @@ def best(rows, tie_key):
 def score():
     if hashlib.sha256(preregistered_text().encode()).hexdigest() != json.loads(PREREG_PATH.read_text())["sha256"]:
         sys.exit("README changed since pre-registration -- refusing to score")
-    data, pilot = splits(), pilot_decisions()
-    patience = pilot["patience"] or pilot["max_epochs"]
+    data, decisions = splits(), pilot_decisions()
+    patience = decisions["patience"] or decisions["max_epochs"]
     results = json.loads(RESULTS_PATH.read_text()) if RESULTS_PATH.exists() else {}
     mlflow.set_experiment(EXPERIMENT_NAME)
     with mlflow.start_run(run_name="selection"):
         print("Random Forest grid (val)")
         rf_rows = run_grid("rf", selection.grid(selection.RF_GRID),
-                           lambda cfg: score_rf(cfg, data, pilot["rf_max_samples"], results), results)
+                           lambda cfg: score_rf(cfg, data, decisions["rf_max_samples"], results), results)
         print("U-Net grid (val)")
-        unet_scorer = lambda cfg: score_unet(cfg, data, pilot["max_epochs"], patience, results)
-        rows = run_grid("unet", selection.grid(UNET_GRID), unet_scorer, results)
+        unet_scorer = lambda cfg: score_unet(cfg, data, decisions["max_epochs"], patience, results)
+        grid = selection.grid(UNET_GRID)
+        rows = run_grid("unet", grid, unet_scorer, results)
         tie = lambda r: (r["config"]["tile_px"], -r["config"]["batch_size"])
-        chosen = best(rows, tie)["config"]
+        # Only the grid rows: on a resume the saved edge rows would trigger the edge rule a second time
+        chosen = best([r for r in rows if r["config"] in grid], tie)["config"]
         edges = [{**chosen, axis: EDGE_STEP[axis][chosen[axis]]} for axis in EDGE_STEP if chosen[axis] in EDGE_STEP[axis]]
-        if chosen["tile_px"] == 192:
-            print("tile 192 selected: extract 288 px tiles before going on (README edge rule)")
         rows = run_grid("unet", edges, unet_scorer, results)
         u, rf = best(rows, tie), best(rf_rows, lambda r: r["config"]["n_estimators"])
+        if u["config"]["tile_px"] == 192:
+            sys.exit("tile 192 selected: extract 288 px tiles before the selection can end (README edge rule)")
         pooled = float(np.sqrt((u["std"] ** 2 + rf["std"] ** 2) / 2))
         results["selection"] = {"unet": u["config"], "rf": rf["config"], "unet_mean": u["mean"], "rf_mean": rf["mean"],
                                 "unet_max_epochs": u["max_epochs"], "unet_minus_rf": u["mean"] - rf["mean"], "pooled_std": pooled,
@@ -199,19 +202,20 @@ def test():
     results = json.loads(RESULTS_PATH.read_text())
     if "test" in results:
         sys.exit("test already run once")
-    data, pilot = splits(), pilot_decisions()
+    data, decisions = splits(), pilot_decisions()
     sel = results["selection"]
     out = {"unet": [], "rf": []}
     mlflow.set_experiment(EXPERIMENT_NAME)
     with mlflow.start_run(run_name="test_once"):
         for seed in selection.SEEDS:
             model, device, _ = unet.train(data["train"], data["val"], seed=seed, max_epochs=sel["unet_max_epochs"],
-                                          patience=pilot["patience"] or pilot["max_epochs"], verbose=False, **sel["unet"])
+                                          patience=decisions["patience"] or decisions["max_epochs"], verbose=False,
+                                          random_window=True, **sel["unet"])
             dice, macro = classifier_report.dice_from_counts(unet.predict_counts_full(model, data["test"], device).sum(axis=0))
             out["unet"].append({"seed": seed, "macro_dice": float(macro), "dice": dict(zip(dl.CLASS_NAMES, dice.tolist()))})
             if seed == 42:
                 unet.save_checkpoint(model, seed)
-            rf = train_rf.train_tiles(data["train"], seed=seed, max_samples=pilot["rf_max_samples"], **sel["rf"])
+            rf = train_rf.train_tiles(data["train"], seed=seed, max_samples=decisions["rf_max_samples"], **sel["rf"])
             dice, macro = classifier_report.dice_from_counts(train_rf.predict_counts_tiles(rf, data["test"]).sum(axis=0))
             out["rf"].append({"seed": seed, "macro_dice": float(macro), "dice": dict(zip(dl.CLASS_NAMES, dice.tolist()))})
         results["test"] = out
