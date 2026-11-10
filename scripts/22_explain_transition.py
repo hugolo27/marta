@@ -93,7 +93,6 @@ def main():
     tiles, n_rows, n_cols = classify_aoi.build_tile_grid(aoi_m)
     assert (n_rows, n_cols) == (meta["n_rows"], meta["n_cols"]), "tile grid drifted from 18's saved grid"
     aoi_wgs84_ee = ee.Geometry(json.loads(classify_aoi.AOI_PATH.read_text())["features"][0]["geometry"])
-    channels = s2_utils.S2_BANDS + ["NDVI"]
 
     transition_name, pixels = pick_fnf_loss_pixels(change) if args.fnf_loss else pick_transition_pixels(change)
     out_prefix = "gradcam_loss" if args.fnf_loss else "gradcam_transition"
@@ -104,7 +103,8 @@ def main():
         print(f"\npixel {i}: (row={row}, col={col}) -> lon={lon:.5f}, lat={lat:.5f}")
 
         for period, (start, end) in PERIODS.items():
-            composite = s2_utils.build_s2_composite(aoi_wgs84_ee, start, end, add_ndvi=True, reproject=True, clip=True)
+            composite, channels = s2_utils.build_season_composite(aoi_wgs84_ee, start, end, model.season,
+                                                                  reproject=True, clip=True)
             patch = extract_patch(composite, channels, tiles, row, col)
             patch_chw = torch.from_numpy(np.ascontiguousarray(patch.transpose(2, 0, 1)))
             pred = int(model(patch_chw.unsqueeze(0).to(device)).argmax(1).item())

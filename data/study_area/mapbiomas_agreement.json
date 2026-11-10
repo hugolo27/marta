@@ -1,31 +1,36 @@
 {
   "no_change": {
-    "n_px": 1810654,
-    "agree_px": 1804343,
-    "agreement": 0.997
+    "n_px": 1869793,
+    "agree_px": 1860268,
+    "agreement": 0.995
   },
   "bosque_a_pasto": {
-    "n_px": 88428,
+    "n_px": 42976,
     "agree_px": 0,
     "agreement": 0.0
   },
   "bosque_a_cultivo": {
-    "n_px": 593,
+    "n_px": 130,
     "agree_px": 0,
     "agreement": 0.0
   },
   "pasto_a_bosque": {
-    "n_px": 49000,
-    "agree_px": 4368,
-    "agreement": 0.089
+    "n_px": 121810,
+    "agree_px": 13927,
+    "agreement": 0.114
+  },
+  "pasto_a_cultivo": {
+    "n_px": 23,
+    "agree_px": 0,
+    "agreement": 0.0
   },
   "cultivo_a_bosque": {
-    "n_px": 62080,
+    "n_px": 9902,
     "agree_px": 0,
     "agreement": 0.0
   },
   "cultivo_a_pasto": {
-    "n_px": 44813,
+    "n_px": 10934,
     "agree_px": 0,
     "agreement": 0.0
   }

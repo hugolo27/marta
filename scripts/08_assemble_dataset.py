@@ -1,5 +1,6 @@
 """Dataset assembly, phase1-dataset-build 6.1-6.3 (format also in docs/METODOLOGIA_PIPELINE.md). Each
-example: 33x33x13 Sentinel-2 window (12 bands + NDVI) centered on one MapBiomas 3x3 label block,
+example: 33x33x26 Sentinel-2 window (12 bands + NDVI, dry composite then wet composite since
+phase1-dataset-v2) centered on one MapBiomas 3x3 label block,
 saved as .npy under data/study_area/dataset/<split>/<class>/, with a manifest. Stratified
 sampling across the wider footprint (AOI alone has no cultivo), excluding 3 held-out sub-regions
 (Filadelfia, Bahia Negra, Pozo Colorado — see HELDOUT_REGIONS, added 2026-09-11 for a broader
@@ -9,8 +10,9 @@ sampleRegions() call for hundreds of patches is too large/slow to be reliable.
 Splits are assigned by spatial block, not per point (fixed 2026-09-03: a leakage check found
 train/test patches from the same real-world scene, since 33x33 patches are 330m across and
 per-point random assignment can land two points from the same field on opposite sides of a
-split). Blocking is done per class, since a spatially clustered rare class (cultivo) could
-otherwise get starved out of a split entirely by a single global blocking. class_id/split are
+split). Blocks are 6 km since phase1-dataset-v2 (the measured autocorrelation range) and are
+assigned regardless of class; they used to be assigned per class, which let two classes
+covering the same ground land in different splits. class_id/split are
 attached as feature properties before extraction and carried through by sampleRegions(), not
 re-derived afterward by matching coordinates from a second independent GEE call.
 
@@ -33,7 +35,10 @@ scale explicitly regardless of the composite's own declared projection metadata.
 Usage: .venv/bin/python scripts/08_assemble_dataset.py"""
 
 import csv
+import json
+import math
 import random
+import sys
 from pathlib import Path
 
 import ee
@@ -47,13 +52,18 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 OUT_DIR = REPO_ROOT / "data" / "study_area" / "dataset"
 
 PERIODS = {"2019": ("2019-06-01", "2019-09-30"), "2023": ("2023-06-01", "2023-09-30")}
+# Wet (leaf-on) composite of the same year as the label, stacked after the dry one (phase1-dataset-v2 D3)
+WET_PERIODS = {"2019": ("2019-01-01", "2019-04-30"), "2023": ("2023-01-01", "2023-04-30")}
 PATCH_RADIUS_PX = 16  # -> 33x33
-N_PER_CLASS = 400  # scaled up from 200 (2026-09-11): the RF-vs-CNN comparison flipped conclusions
-# 3 times across 6 code-review rounds at n=200/class, itself evidence the comparison was
-# underpowered relative to the effect size at stake
+N_PER_CLASS = 1000  # 200 -> 400 (2026-09-11, conclusions kept flipping at n=200), 400 -> 1,000 in
+# phase1-dataset-v2: a 361-patch validation split couldn't separate 3x3 from 33x33 inputs
 BATCH_SIZE = 25  # points per sampleRegions() call
 SPLIT_RATIOS = {"train": 0.7, "val": 0.15, "test": 0.15}
-GRID_SIZE_DEG = 0.02  # ~2km at this latitude, >6x the 330m patch side, buffers train/test separation
+# Block side from the measured spatial autocorrelation (33_spatial_autocorrelation.py), not a chosen
+# distance: the old ~2 km blocks were inside the 4-5 km range where points still resemble each other
+BLOCK_KM = json.loads((REPO_ROOT / "data" / "study_area" / "spatial_autocorrelation" / "results.json").read_text())["block_side_km"]
+KM_PER_DEG = 111.32
+MIN_EVAL_SHARE = 0.10  # per class, in val and in test, or the build stops (pre-registered)
 PATCH_SIDE_M = 330  # 33px * 10m, the patch-overlap distance the buffer check enforces
 
 # 3 held-out sub-regions, one per landscape topology, so a generalization check (phase1-classifier
@@ -91,8 +101,12 @@ def wider_footprint_minus_heldout():
     return footprint
 
 
-def block_key(lon, lat, grid_size=GRID_SIZE_DEG):
-    return (round(lon / grid_size), round(lat / grid_size))
+def block_key(lon, lat, block_km=BLOCK_KM):
+    """Square-ish blocks of block_km: rows in latitude, then columns in longitude scaled by the
+    cosine of the row's own latitude, so a block is block_km wide wherever it is."""
+    row = math.floor(lat * KM_PER_DEG / block_km)
+    lat_center = (row + 0.5) * block_km / KM_PER_DEG
+    return row, math.floor(lon * KM_PER_DEG * math.cos(math.radians(lat_center)) / block_km)
 
 
 def haversine_m(lon1, lat1, lon2, lat2):
@@ -104,50 +118,44 @@ def haversine_m(lon1, lat1, lon2, lat2):
 
 
 def assign_splits_by_spatial_block(points_info, seed=42):
-    """Groups points into ~2km blocks per class and assigns whole blocks to one split, so no
-    train/test pair can share a near-duplicate patch. Returns {(lon, lat): split}.
+    """Assigns whole blocks to one split, whatever the class of the points inside, so a block
+    separates locations, not classes (phase1-dataset-v2 D2). Blocking used to run per class to
+    guarantee every class in every split, which let a forest block and a pasture block covering
+    the same ground land in different splits. With 6 km blocks and thousands of points, class
+    balance is checked instead (check_class_balance). Returns {(lon, lat): split}.
 
-    Guarantees at least 1 block per split when there are >= 3 blocks for a class (naive
-    round() could allocate every block to train, silently leaving val/test with 0 examples of
-    that class — found via code review 2026-09-04); warns instead of silently degrading when
-    there are too few blocks to guarantee it.
-
-    A location can carry a different class_id per period (a real land-cover transition, not a
-    bug) — grouping by one canonical class per coordinate first means each location goes
-    through exactly one block/split decision, instead of one computed independently per class
-    occurrence that could silently overwrite another's in the shared split_lookup below (code
-    review 2026-09-13: audited the manifest, found 64 locations affected — the later period's
-    class wins as canonical, an explicit and deterministic choice, not an arbitrary one)."""
+    A location can carry a different class_id per period (a real land-cover transition); it
+    still goes through exactly one block/split decision, shared by both periods."""
     canonical = {(round(p["lon"], 6), round(p["lat"], 6)): p for p in points_info}
-
-    by_class = {}
+    blocks = {}
     for p in canonical.values():
-        by_class.setdefault(p["class_id"], []).append(p)
+        blocks.setdefault(block_key(p["lon"], p["lat"]), []).append(p)
+    block_keys = sorted(blocks)
+    random.Random(seed).shuffle(block_keys)
 
+    n = len(block_keys)
+    n_val, n_test = round(n * SPLIT_RATIOS["val"]), round(n * SPLIT_RATIOS["test"])
+    n_train = n - n_val - n_test
     split_lookup = {}
-    for class_id, pts in by_class.items():
-        blocks = {}
-        for p in pts:
-            blocks.setdefault(block_key(p["lon"], p["lat"]), []).append(p)
-        block_keys = list(blocks.keys())
-        rng = random.Random(seed + class_id)
-        rng.shuffle(block_keys)
-
-        n = len(block_keys)
-        if n < 3:
-            print(f"  WARNING: class {class_id} has only {n} spatial block(s) — "
-                  f"cannot guarantee all 3 splits contain this class")
-            n_val = n_test = 0
-        else:
-            n_val = max(1, round(n * SPLIT_RATIOS["val"]))
-            n_test = max(1, round(n * SPLIT_RATIOS["test"]))
-        n_train = n - n_val - n_test
-
-        for i, key in enumerate(block_keys):
-            split = "train" if i < n_train else ("val" if i < n_train + n_val else "test")
-            for p in blocks[key]:
-                split_lookup[(round(p["lon"], 6), round(p["lat"], 6))] = split
+    for i, key in enumerate(block_keys):
+        split = "train" if i < n_train else ("val" if i < n_train + n_val else "test")
+        for p in blocks[key]:
+            split_lookup[(round(p["lon"], 6), round(p["lat"], 6))] = split
+    print(f"  {n} blocks of {BLOCK_KM} km: {n_train} train, {n_val} val, {n_test} test")
     return split_lookup
+
+
+def check_class_balance(points_info, split_lookup):
+    counts = {}
+    for p in points_info:
+        split = split_lookup[(round(p["lon"], 6), round(p["lat"], 6))]
+        counts.setdefault(p["class_id"], {"train": 0, "val": 0, "test": 0})[split] += 1
+    for class_id, c in sorted(counts.items()):
+        total = sum(c.values())
+        print(f"  class {class_id}: {c} ({c['val'] / total:.1%} val, {c['test'] / total:.1%} test)")
+        if min(c["val"], c["test"]) < MIN_EVAL_SHARE * total:
+            sys.exit(f"class {class_id} below {MIN_EVAL_SHARE:.0%} in val or test -- refusing to build")
+    return counts
 
 
 def enforce_spatial_buffer(points_info, split_lookup, threshold_m=PATCH_SIDE_M):
@@ -156,17 +164,16 @@ def enforce_spatial_buffer(points_info, split_lookup, threshold_m=PATCH_SIDE_M):
     two points a few meters apart can round into different blocks (found via code review
     2026-09-04) — this closes that gap for real regardless of where points happen to fall,
     rather than relying on empirically checking one generated point set after the fact."""
-    n = len(points_info)
-    splits = [split_lookup[(round(p["lon"], 6), round(p["lat"], 6))] for p in points_info]
+    splits = np.array([split_lookup[(round(p["lon"], 6), round(p["lat"], 6))] for p in points_info])
+    lon = np.array([p["lon"] for p in points_info])
+    lat = np.array([p["lat"] for p in points_info])
     to_drop = set()
-    for i in range(n):
-        for j in range(i + 1, n):
-            if splits[i] == splits[j] or (i in to_drop and j in to_drop):
-                continue
-            d = haversine_m(points_info[i]["lon"], points_info[i]["lat"], points_info[j]["lon"], points_info[j]["lat"])
-            if d < threshold_m:
-                to_drop.add(i)
-                to_drop.add(j)
+    for i in range(len(points_info) - 1):
+        d = haversine_m(lon[i], lat[i], lon[i + 1:], lat[i + 1:])
+        close = np.nonzero((splits[i + 1:] != splits[i]) & (d < threshold_m))[0]
+        if close.size:
+            to_drop.add(i)
+            to_drop.update((close + i + 1).tolist())
     if to_drop:
         print(f"  buffer check: dropping {len(to_drop)} points within {threshold_m}m of an opposite-split point")
     return [p for idx, p in enumerate(points_info) if idx not in to_drop]
@@ -212,6 +219,7 @@ def main():
         all_points.extend(sample_period_points(sampling_area, period))
     split_lookup = assign_splits_by_spatial_block(all_points, seed=42)
     all_points = enforce_spatial_buffer(all_points, split_lookup)
+    balance = check_class_balance(all_points, split_lookup)
 
     points_by_period = {period: [] for period in PERIODS}
     for p in all_points:
@@ -219,7 +227,7 @@ def main():
 
     manifest_rows = []
     counters = {"train": 0, "val": 0, "test": 0}
-    skipped_gap = 0
+    skipped = {"dry_gap": 0, "wet_gap": 0}
 
     for period, (start, end) in PERIODS.items():
         points_info = points_by_period[period]
@@ -230,8 +238,12 @@ def main():
         # clip=True: sampling_area has the Filadelfia held-out rectangle carved out as a hole —
         # without clipping, a point's 330m extraction window near that hole's boundary could pull
         # real pixels from inside the excluded region (code review 2026-09-11).
-        s2 = s2_utils.build_s2_composite(sampling_area, start, end, add_ndvi=True, reproject=False, clip=True)
-        channels = s2_utils.S2_BANDS + ["NDVI"]
+        dry = s2_utils.build_s2_composite(sampling_area, start, end, add_ndvi=True, reproject=False, clip=True)
+        wet = s2_utils.build_s2_composite(sampling_area, *WET_PERIODS[period], add_ndvi=True, reproject=False, clip=True)
+        dry_channels = s2_utils.S2_BANDS + ["NDVI"]
+        wet_channels = [f"{c}_wet" for c in dry_channels]
+        channels = dry_channels + wet_channels
+        s2 = dry.select(dry_channels).addBands(wet.select(dry_channels).rename(wet_channels))
 
         points_with_split = ee.FeatureCollection([
             ee.Feature(
@@ -262,13 +274,17 @@ def main():
                 split = props["split"]
                 class_name = mapbiomas_legend.CLASS_NAMES[class_id]
                 arrays = [np.array(props[ch]) for ch in channels]
-                patch = np.stack(arrays, axis=-1)  # (33, 33, 13)
+                patch = np.stack(arrays, axis=-1).astype(np.float32)  # (33, 33, 26): dry, then wet
 
                 # A real Sentinel-2 pixel is never exactly 0 across all 13 channels at once;
                 # that pattern only comes from a masked/cloud-gap pixel. Skip rather than train
-                # on fabricated data (code review 2026-09-03).
-                if np.any(np.all(patch == 0, axis=-1)):
-                    skipped_gap += 1
+                # on fabricated data (code review 2026-09-03). Counted per season, because too many
+                # wet-only gaps rule out the dry+wet variants (pre-registered, phase1-dataset-v2).
+                if np.any(np.all(patch[..., :13] == 0, axis=-1)):
+                    skipped["dry_gap"] += 1
+                    continue
+                if np.any(np.all(patch[..., 13:] == 0, axis=-1)):
+                    skipped["wet_gap"] += 1
                     continue
 
                 counters[split] += 1
@@ -294,7 +310,11 @@ def main():
         writer.writeheader()
         writer.writerows(manifest_rows)
 
-    print(f"\nTotal patches: {len(manifest_rows)} ({skipped_gap} skipped for containing masked/gap pixels)")
+    stats = {"block_km": BLOCK_KM, "points_after_buffer": len(all_points), "patches": len(manifest_rows),
+             "skipped": skipped, "wet_gap_share": skipped["wet_gap"] / len(all_points),
+             "class_balance": {mapbiomas_legend.CLASS_NAMES[k]: v for k, v in balance.items()}, "split_counts": counters}
+    (OUT_DIR / "build_stats.json").write_text(json.dumps(stats, indent=2))
+    print(f"\nTotal patches: {len(manifest_rows)} (skipped for no-data pixels: {skipped})")
     print(f"Split counts: {counters}")
     print(f"Manifest: {manifest_path}")
 

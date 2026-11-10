@@ -14,6 +14,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = REPO_ROOT / "data" / "study_area" / "dataset" / "manifest.csv"
 CLASS_TO_ID = {"bosque": 0, "pasto": 1, "cultivo": 2}
 CLASS_NAMES = [name for name, _ in sorted(CLASS_TO_ID.items(), key=lambda kv: kv[1])]
+# Patches hold the dry composite (12 bands + NDVI) and, since phase1-dataset-v2, the wet one after it.
+SEASON_CHANNELS = {"dry": slice(0, 13), "drywet": slice(0, 26)}
 
 
 @lru_cache(maxsize=None)
@@ -28,17 +30,27 @@ def load_manifest(split=None):
 
 
 @lru_cache(maxsize=None)
-def load_pixel_features(split):
-    """Center-pixel spectral features for Random Forest: (N, 13) array + (N,) labels."""
+def load_pixel_features(split, season="dry"):
+    """Center-pixel spectral features for Random Forest: (N, 13 or 26) array + (N,) labels."""
     rows = load_manifest(split)
-    X = np.zeros((len(rows), 13), dtype=np.float32)
+    channels = SEASON_CHANNELS[season]
+    X = np.zeros((len(rows), channels.stop - channels.start), dtype=np.float32)
     y = np.zeros(len(rows), dtype=np.int64)
     for i, row in enumerate(rows):
         patch = np.load(REPO_ROOT / row["path"])
         center = patch.shape[0] // 2  # derived from the actual array, not a hardcoded 16
-        X[i] = patch[center, center, :]
+        X[i] = patch[center, center, channels]
         y[i] = CLASS_TO_ID[row["class"]]
     return X, y
+
+
+@lru_cache(maxsize=None)
+def channel_stats(season="dry"):
+    """Per-channel mean and standard deviation over every pixel of the train split, used to
+    normalize the CNN input (phase1-dataset-v2). Train only: val and test must not shape it."""
+    patches = np.stack([load_patch(r["path"])[..., SEASON_CHANNELS[season]] for r in load_manifest("train")])
+    flat = patches.reshape(-1, patches.shape[-1]).astype(np.float64)
+    return flat.mean(axis=0).astype(np.float32), flat.std(axis=0).astype(np.float32)
 
 
 @lru_cache(maxsize=None)
@@ -53,16 +65,17 @@ def load_patch(path):
 class PatchDataset(Dataset):
     """33x33x13 patches for the CNN, channel-first for PyTorch conv layers."""
 
-    def __init__(self, split, augment=False):
+    def __init__(self, split, augment=False, season="dry"):
         self.rows = load_manifest(split)
         self.augment = augment
+        self.channels = SEASON_CHANNELS[season]
 
     def __len__(self):
         return len(self.rows)
 
     def __getitem__(self, idx):
         row = self.rows[idx]
-        patch = load_patch(row["path"])
+        patch = load_patch(row["path"])[..., self.channels]
         if self.augment:
             k = np.random.randint(4)
             patch = np.rot90(patch, k, axes=(0, 1))
@@ -73,3 +86,4 @@ class PatchDataset(Dataset):
         patch = np.ascontiguousarray(patch.transpose(2, 0, 1))  # (13, 33, 33)
         label = CLASS_TO_ID[row["class"]]
         return torch.from_numpy(patch), label
+

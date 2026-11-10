@@ -90,3 +90,17 @@ def build_s2_composite(region, start, end, add_ndvi=True, raise_on_gap=False, re
         ndvi = composite.normalizedDifference(["B8", "B4"]).rename("NDVI")
         composite = composite.addBands(ndvi)
     return composite
+
+
+def build_season_composite(region, start, end, season, **kwargs):
+    """The dry composite for start-end, plus, for season "drywet", the wet one (January-April of
+    the same year) with a _wet suffix: the 26-channel stack 08_assemble_dataset.py trains on.
+    Returns the image and its channel names in order."""
+    channels = S2_BANDS + ["NDVI"]
+    image = build_s2_composite(region, start, end, add_ndvi=True, **kwargs).select(channels)
+    if season == "dry":
+        return image, channels
+    year = start[:4]
+    wet_channels = [f"{c}_wet" for c in channels]
+    wet = build_s2_composite(region, f"{year}-01-01", f"{year}-04-30", add_ndvi=True, **kwargs)
+    return image.addBands(wet.select(channels).rename(wet_channels)), channels + wet_channels

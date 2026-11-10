@@ -19,7 +19,8 @@ rather than fed to the CNN as if they were real pixels.
 Also stores per-pixel softmax probabilities next to each class raster, and can run over the
 change-development area and the in-between years -- both needed by
 phase1-change-detection-hardening (confidence and persistence filters, and a second area with
-real clearing to score them on). Same checkpoint, same June-September window for every year.
+real clearing to score them on). Same checkpoint, same June-September window for every year, plus
+January-April of the same year when the checkpoint uses the wet season.
 
 Usage: .venv/bin/python scripts/18_classify_aoi_temporal.py [--area aoi|dev] [--years 2019 2023]"""
 
@@ -100,16 +101,20 @@ def pull_tile(composite, channels, padded_utm):
     rect = ee.Geometry.Rectangle([lon0, lat0, lon1, lat1])
     result = composite.select(channels).sampleRectangle(region=rect, defaultValue=0).getInfo()
     arrays = [np.array(result["properties"][ch], dtype=np.float32) for ch in channels]
-    return np.stack(arrays, axis=-1)  # (H, W, 13), H/W close to but not exactly TILE_CORE_PX + 2*PATCH_RADIUS_PX
+    return np.stack(arrays, axis=-1)  # (H, W, channels), H/W close to but not exactly TILE_CORE_PX + 2*PATCH_RADIUS_PX
 
 
 def classify_tile(grid, model, device):
     """Same row-chunked dense inference as 13_visualize_classification_map.py, but the output
     here is the tile's PADDED grid classified in full -- the caller crops to the core afterward,
     rather than reflect-padding at tile edges (which would fabricate context at every tile
-    boundary, not just the AOI's true edge)."""
+    boundary, not just the AOI's true edge). Windows are the model's own input size: a 3x3 model
+    doesn't need the 33x33 padding, and 33x33 windows over 26 channels would not fit in memory."""
+    half = model.patch_px // 2
+    trim = PATCH_RADIUS_PX - half
+    grid = grid[trim:grid.shape[0] - trim, trim:grid.shape[1] - trim]
     h, w, c = grid.shape
-    out_h, out_w = h - 2 * PATCH_RADIUS_PX, w - 2 * PATCH_RADIUS_PX
+    out_h, out_w = h - 2 * half, w - 2 * half
     out = np.full((out_h, out_w), UNCLASSIFIED, dtype=np.int64)
     out_proba = np.full((out_h, out_w, len(CLASS_NAMES)), np.nan, dtype=np.float16)
 
@@ -118,17 +123,19 @@ def classify_tile(grid, model, device):
     with torch.no_grad():
         for row_start in range(0, out_h, ROW_CHUNK):
             row_end = min(row_start + ROW_CHUNK, out_h)
-            strip = grid[row_start:row_end + 2 * PATCH_RADIUS_PX]
-            windows = sliding_window_view(strip, (2 * PATCH_RADIUS_PX + 1, 2 * PATCH_RADIUS_PX + 1, c))[:, :, 0]
+            strip = grid[row_start:row_end + 2 * half]
+            windows = sliding_window_view(strip, (2 * half + 1, 2 * half + 1, c))[:, :, 0]
             n_rows = windows.shape[0]
-            flat = windows.reshape(n_rows * out_w, 2 * PATCH_RADIUS_PX + 1, 2 * PATCH_RADIUS_PX + 1, c)
+            flat = windows.reshape(n_rows * out_w, 2 * half + 1, 2 * half + 1, c)
             flat = flat.transpose(0, 3, 1, 2)
 
             # A center pixel that's all-zero across every channel is a masked/gap/outside-AOI
             # pixel (08_assemble_dataset.py's established convention) -- never fed to the CNN as
-            # if it were real, marked UNCLASSIFIED directly instead.
-            centers = strip[PATCH_RADIUS_PX:PATCH_RADIUS_PX + (row_end - row_start), PATCH_RADIUS_PX:PATCH_RADIUS_PX + out_w]
-            valid = ~np.all(centers == 0, axis=-1)  # (rows_here, out_w)
+            # if it were real, marked UNCLASSIFIED directly instead. Checked per composite: a
+            # dry+wet pixel with only the wet composite missing is a gap too.
+            centers = strip[half:half + (row_end - row_start), half:half + out_w]
+            per_composite = centers.reshape(*centers.shape[:-1], -1, len(s2_utils.S2_BANDS) + 1)
+            valid = ~np.all(per_composite == 0, axis=-1).any(axis=-1)  # (rows_here, out_w)
 
             preds = np.full(n_rows * out_w, UNCLASSIFIED, dtype=np.int64)
             proba = np.full((n_rows * out_w, len(CLASS_NAMES)), np.nan, dtype=np.float16)
@@ -149,8 +156,7 @@ def classify_tile(grid, model, device):
 
 def classify_period(period, start, end, model, device, area_path, tiles, n_rows, n_cols):
     area_wgs84 = ee.Geometry(json.loads(area_path.read_text())["features"][0]["geometry"])
-    composite = s2_utils.build_s2_composite(area_wgs84, start, end, add_ndvi=True, reproject=True, clip=True)
-    channels = s2_utils.S2_BANDS + ["NDVI"]
+    composite, channels = s2_utils.build_season_composite(area_wgs84, start, end, model.season, reproject=True, clip=True)
 
     full = np.full((n_rows * TILE_CORE_PX, n_cols * TILE_CORE_PX), UNCLASSIFIED, dtype=np.int64)
     full_proba = np.full((n_rows * TILE_CORE_PX, n_cols * TILE_CORE_PX, len(CLASS_NAMES)), np.nan, dtype=np.float16)
