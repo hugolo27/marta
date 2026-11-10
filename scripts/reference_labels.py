@@ -29,6 +29,9 @@ def parse(row, date):
     rec = {"label": label, "crown": get("crown"), "patch": get("patch"), "height": get("height"),
            "near_threshold": get("near_threshold") in YES, "narrow_strip": get("narrow_strip") in YES}
     pid = row["point_id"]
+    # A capture from another year would put a change in the wrong period, which is what this measures
+    if not get("imagery_date").startswith(date):
+        raise ValueError(f"{pid} {date}: imagery_date={get('imagery_date')!r} is not from {date}, leave the label empty")
     if label not in LABELS or rec["crown"] not in CROWN:
         raise ValueError(f"{pid} {date}: label={label!r} crown={rec['crown']!r}")
     if rec["crown"] != "lt10" and (rec["patch"] not in PATCH or rec["height"] not in HEIGHT):

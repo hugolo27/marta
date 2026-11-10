@@ -69,8 +69,9 @@ crosses inside it. Each cross stands for 4% of the square.
      contradicts its attributes.
    - `imagery_source_<year>` (`google_earth` / `esri_wayback` / other) and `imagery_date_<year>`.
 4. Can't tell (no same-year imagery, clouds, too blurry)? Leave `label_<year>` **empty** and write
-   why in `uninterpretable_reason`. Never guess: an empty label is excluded and counted, a guess
-   silently biases the result.
+   why in `uninterpretable_reason`. No tolerance on the year: a label whose `imagery_date_<year>` is
+   from another year is rejected on save and by the assessment scripts. Never guess: an empty label
+   is excluded and counted, a guess silently biases the result.
 5. `notes`: anything uncertain ("edge of a clearing", "burn scar?", "flooded").
 
 Label the 2019 and 2023 of the same point one after the other, in the same view. Don't look up the

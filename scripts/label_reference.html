@@ -206,7 +206,7 @@ function setupCaptures(date, map, captures, row) {
   const sel = $(`cap_${date}`);
   const chosen = pickCapture(captures, date) || captures.reduce((best, c) => !best || Math.abs(+c.date.slice(0, 4) - date) < Math.abs(+best.date.slice(0, 4) - date) ? c : best, null);
   sel.innerHTML = captures.map((c, k) => `<option value="${k}" ${c === chosen ? "selected" : ""}>${c.date} · ${c.sensor} · ${c.res} m${leafOn(c.date) ? " · hoja" : ""}</option>`).join("");
-  $(`capwarn_${date}`).textContent = chosen && chosen.date.startsWith(date) ? "" : `sin imagen de ${date} en Wayback: probá Google Earth`;
+  $(`capwarn_${date}`).textContent = chosen && chosen.date.startsWith(date) ? "" : `sin imagen de ${date} en Wayback: probá Google Earth o dejá la etiqueta vacía`;
   const apply = () => {
     const c = captures[+sel.value];
     if (!c) return;
