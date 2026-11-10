@@ -11,7 +11,7 @@ See proposal.md for motivation. Relevant current state:
 ## Goals / Non-Goals
 
 **Goals:**
-- Evaluate the tutor's 3x3 design under the same protocol as the current CNN.
+- Evaluate a 3x3 input under the same protocol as the current CNN.
 - Decide the operational CNN with a rule fixed before scoring.
 
 **Non-Goals:** see proposal.md.
@@ -29,7 +29,7 @@ See proposal.md for motivation. Relevant current state:
 - The 33x33 CNN is not re-scored: its per-seed validation scores for the selected configuration are taken from `data/study_area/hyperparameter_selection/results.json` (same seeds, same split, same code path, since `patch_px=33` leaves `forward()` unchanged). A seed-42 re-run checks that it reproduces.
 
 ### D3. Patch-size rule (pre-registered)
-- 3x3 is the default because it is the tutor's design.
+- 3x3 is the default because it is the simpler input. The pre-registered README gave the tutor's design as the reason, which was wrong (correction of 2026-11-10 in that README).
 - Pooled std = sqrt((s_33² + s_3²) / 2), from the 5 validation scores of each selected configuration.
 - If mean_33 − mean_3 > pooled std, the 33x33 CNN stays operational. Otherwise the 3x3 CNN becomes operational.
 - Written in `data/study_area/patch_size_selection/README.md` above `## Results`, hashed and logged to MLflow before the first 3x3 run, checked by the scoring step, as in `24_hyperparameter_selection.py`.
@@ -51,6 +51,6 @@ If the 33x33 CNN stays, nothing downstream changes.
 
 ## Risks / Trade-offs
 
-- **Grad-CAM loses spatial detail with 3x3.** A 3x3 map over 30 m can only say which of the 9 pixels weighed most. This was weighed against matching the tutor's design and accepted; the thesis reports it as the cost of the choice.
+- **Grad-CAM loses spatial detail with 3x3.** A 3x3 map over 30 m can only say which of the 9 pixels weighed most. This was accepted as the cost of the simpler input; the thesis reports it as the cost of the choice.
 - **A 3x3 CNN is close to a per-pixel classifier.** If it behaves like Random Forest, the RF vs. CNN comparison becomes a comparison of two near-pixel models. The test and held-out results will show it, and the thesis reports it as found.
 - **The default favours 3x3.** Deliberate, and stated before scoring: the 33x33 design has to beat noise to stay.

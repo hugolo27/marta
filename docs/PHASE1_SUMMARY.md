@@ -134,8 +134,9 @@ It was not used to choose anything, including the grid values, and is kept only 
 
 ## Dataset v2 and variant selection (October 2026)
 
-Prompted by the tutor's review: the CNN input size had never been tested against the original
-3×3 design, and the ~2 km split blocks had been set by hand.
+Prompted by the tutor's review: the CNN input size had never been tested against a 3×3 input,
+and the ~2 km split blocks had been set by hand. The 3×3 default was wrongly attributed to the
+tutor, who had suggested a larger input (correction of 2026-11-10 in `phase1-patch-size`).
 
 - **Input size** ([`phase1-patch-size`](../openspec/changes/phase1-patch-size/)): the same CNN
   reading only the central 3×3 block, with its own grid on val. Val: 3×3 0.837 ± 0.010, 33×33
