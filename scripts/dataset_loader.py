@@ -41,6 +41,15 @@ def load_pixel_features(split):
     return X, y
 
 
+@lru_cache(maxsize=None)
+def load_patch(path):
+    """Cached: every epoch of every seed re-reads the same ~2,400 small files, which dominated
+    training time (phase1-patch-size). Callers get a read-only array and copy before changing it."""
+    patch = np.load(REPO_ROOT / path).astype(np.float32)
+    patch.flags.writeable = False
+    return patch
+
+
 class PatchDataset(Dataset):
     """33x33x13 patches for the CNN, channel-first for PyTorch conv layers."""
 
@@ -53,7 +62,7 @@ class PatchDataset(Dataset):
 
     def __getitem__(self, idx):
         row = self.rows[idx]
-        patch = np.load(REPO_ROOT / row["path"]).astype(np.float32)
+        patch = load_patch(row["path"])
         if self.augment:
             k = np.random.randint(4)
             patch = np.rot90(patch, k, axes=(0, 1))

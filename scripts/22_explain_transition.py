@@ -118,7 +118,7 @@ def main():
             grad_cam.render_overlay(
                 patch, result["sharpened"],
                 f"{transition_name} pixel {i}, {period} (predicted: {dl.CLASS_NAMES[pred]})",
-                out_path,
+                out_path, cam_px=result["raw_cam_8x8"].shape[0],
             )
             print(f"  saved: {out_path}")
 
