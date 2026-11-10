@@ -150,8 +150,9 @@ Sentinel-2 de 33×33 píxeles centrada en un bloque de 3×3 píxeles nativos (10
 exactamente a un píxel de MapBiomas (30 m). Esa correspondencia 3×3 sale directo de la relación de
 resolución (30 m equivale a 3 × 10 m) y se obtiene reproyectando MapBiomas sobre la grilla propia
 de Sentinel-2. Desde el dataset v2 (`phase1-dataset-v2`, octubre de 2026) la CNN operativa lee
-solo el bloque central de 3×3, el diseño original del tutor: con la ventana completa de 33×33 no
-superó al 3×3 en validación (`phase1-patch-size`). La ventana completa se sigue guardando. Cada
+solo el bloque central de 3×3: con la ventana completa de 33×33 no superó al 3×3 en validación
+(`phase1-patch-size`). El 3×3 quedó por defecto atribuido por error al tutor, que había sugerido
+una entrada más grande (corrección del 10/11/2026 en ese change). La ventana completa se sigue guardando. Cada
 ejemplo lleva 26 canales: 12 bandas + NDVI del compuesto de época seca (junio a septiembre) y lo
 mismo del de época húmeda (enero a abril del mismo año). Son 1.000 puntos por clase y año, 5.993
 ejemplos después de los controles de calidad (antes: 400 por clase y año, solo época seca). La

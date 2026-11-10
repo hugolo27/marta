@@ -88,3 +88,10 @@ selected configuration per variant:
   std 0.002). **Operational: CNN B (3x3 dry+wet) and RF dry+wet.** Both are now the defaults of
   `10_train_cnn.py` and `09_train_random_forest.py`.
 - Test was run once, after the decision, and used for nothing.
+
+**Correction (2026-11-10).** Amendment 2 gives "the tutor's guidance to work with 3x3 input" as its
+reason. That is wrong: the tutor proposed the 3x3 block to align Sentinel-2 with MapBiomas, and
+suggested a larger input (correction in `../patch_size_selection/README.md`). The amendment is left
+as it was hashed. Its effect was to stop the 33x33 variants: C reached 0.864 +/- 0.005 over 23 of
+48 configurations, and D never started. They stay exploratory and are not re-run, because the CNN
+line was replaced by the U-Net on 192 px tiles (`phase1-segmentation`).

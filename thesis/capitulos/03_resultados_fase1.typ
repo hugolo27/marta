@@ -122,9 +122,9 @@ muestra de referencia, que todavía no se había interpretado.
 
 == Tamaño de entrada de la CNN: 3×3 contra 33×33
 
-El diseño original del tutor era una matriz de 3×3 píxeles de Sentinel-2 por píxel de
-MapBiomas. Se usó como unidad de alineación de la etiqueta, y la CNN se amplió a una ventana
-de 33×33 para darle contexto espacial, sin evaluar la versión de 3×3. Para compararlas se
+Cada píxel de MapBiomas se alinea con un bloque de 3×3 píxeles de Sentinel-2, para conservar
+la resolución nativa de 10 m. La CNN usaba una ventana de 33×33 centrada en ese bloque para
+tener contexto espacial, y nunca se había comparado con una entrada de 3×3. Para compararlas se
 entrenó la misma CNN mirando solo el bloque central de 3×3 de cada ventana (mismos
 parámetros, sin las capas de _pooling_ que una entrada de 3×3 no admite), con sus
 hiperparámetros elegidos en validación (36 configuraciones, 5 semillas;
@@ -146,7 +146,9 @@ elegir, el 33×33 gana con claridad y el 3×3 rinde igual que el Random Forest: 
 la CNN se comporta casi como un clasificador por píxel. El split de validación (361
 ejemplos) resultó demasiado chico para separar las dos variantes. A partir de este resultado
 el trabajo sigue con la entrada de 3×3, sobre un dataset más grande (sección "Dataset final
-y selección de variantes").
+y selección de variantes"). La regla dejó el 3×3 por defecto atribuyéndolo al tutor, y esa
+atribución fue un error: el tutor había sugerido una entrada más grande. La regla se aplicó tal
+como se registró.
 
 == Autocorrelación espacial y tamaño de los bloques
 

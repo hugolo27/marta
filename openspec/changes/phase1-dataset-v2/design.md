@@ -29,7 +29,7 @@ See proposal.md. Current state: 2,393 patches (400 per class and year, 7 dropped
 ### D4. Variant selection (pre-registered)
 - **Hyperparameters, per variant**, on validation, 5 seeds (42, 1, 7, 123, 2026), `ddof=1`, truncation rule as before. CNN grid: `lr` {0.0001, 0.0003, 0.001} × `dropout` {0.3, 0.4, 0.5, 0.6} × `batch_size` {8, 16, 32, 64}. RF grid: as in `phase1-hyperparameter-selection`. Selected configuration: the highest mean; ties go to the lower training cost.
 - **Edge rule:** if the selected value of `dropout` or `batch_size` is on the edge of its axis (0.6, or 8 or 64), that axis is extended by one step (0.7; 4 or 128) for the selected values of the other two axes, and the selection is redone. Once, not recursively.
-- **CNN variants:** A = 3x3 dry (default), B = 3x3 dry+wet, C = 33x33 dry, D = 33x33 dry+wet. The candidate is the variant with the highest mean validation macro-F1. It replaces A only if it beats A by more than their pooled std. A is the default because it follows the tutor's 3x3 design and is the simplest.
+- **CNN variants:** A = 3x3 dry (default), B = 3x3 dry+wet, C = 33x33 dry, D = 33x33 dry+wet. The candidate is the variant with the highest mean validation macro-F1. It replaces A only if it beats A by more than their pooled std. A is the default because it is the simplest.
 - **RF variants:** dry (default) and dry+wet. Dry+wet replaces dry only if it beats it by more than their pooled std.
 - Written in `data/study_area/variant_selection/README.md` above `## Results`, hashed and logged to MLflow before the first scoring run, checked by the scoring step.
 
@@ -38,7 +38,7 @@ See proposal.md. Current state: 2,393 patches (400 per class and year, 7 dropped
 - Added to the pre-registration as an amendment on 2026-10-19, before the dataset was finished and before any variant was scored; the first registration is kept in `preregistration_v1.json`.
 
 ### D4c. 3x3 input (amendment)
-- Following the tutor's guidance to work with 3x3 input, the variant rule compares A (default) and B. The 33x33 variants had been started; their partial results stay in `results.json` as exploratory. The registration before this amendment is kept in `preregistration_v2.json`.
+- The variant rule compares A (default) and B. The pre-registered amendment gives the tutor's guidance as the reason, which was wrong: the tutor suggested a larger input (correction of 2026-11-10 in `data/study_area/variant_selection/README.md`). The 33x33 variants had been started; their partial results stay in `results.json` as exploratory. The registration before this amendment is kept in `preregistration_v2.json`.
 - Grad-CAM on a 3x3 input gives a 3x3 heatmap (90 m): it shows which part of the block weighed, not spatial context.
 
 ### D5. Test once and cascade
