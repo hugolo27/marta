@@ -59,3 +59,11 @@ operational.
 
 Test, reported once and not used for the choice: 3x3 0.810 ± 0.011, 33x33 0.860 ± 0.008. For
 reference, Random Forest on test is 0.811 ± 0.005 (`../comparison_results.json`).
+
+**Correction (2026-11-10).** The rule above made 3x3 the default "because it is the tutor's
+design". That attribution is wrong. The tutor proposed the 3x3 block as a way to align Sentinel-2
+(10 m) with MapBiomas (30 m), not as the CNN input size, and suggested moving to a larger input.
+The pre-registered text is left as it was hashed and the results stand as they ran: by the rule,
+3x3 became operational. With 33x33 as the default, 33x33 would have stayed, and it also did better
+on test. The CNN line was later replaced by the U-Net on 192 px tiles (`phase1-segmentation`),
+which follows the tutor's suggestion.

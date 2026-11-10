@@ -1,6 +1,8 @@
 ## Why
 
-The tutor's design for the dataset was a 3x3 matrix of Sentinel-2 pixels (10 m) per MapBiomas pixel (30 m), keeping Sentinel-2's native resolution as input. The 3x3 block was implemented as the label alignment unit, but during `phase1-dataset-build` the CNN input was widened to a 33x33 patch (~330 m) centered on that block, to give the CNN spatial context to learn from. That widening was never evaluated against the tutor's original design.
+Each MapBiomas pixel (30 m) is aligned with a 3x3 block of Sentinel-2 pixels (10 m), as the tutor proposed to keep Sentinel-2's native resolution. During `phase1-dataset-build` the CNN input was set to a 33x33 patch (~330 m) centered on that block, to give the CNN spatial context to learn from. A 3x3 input had never been evaluated against it.
+
+**Correction (2026-11-10):** an earlier version of this proposal called the 3x3 input "the tutor's design". The tutor proposed the 3x3 block for alignment, not as the input size, and suggested a larger input. See the correction in `data/study_area/patch_size_selection/README.md`.
 
 Two observations make the comparison worth running now:
 
@@ -13,7 +15,7 @@ No reference point has been interpreted yet, so a change of the operational CNN 
 
 - **3x3 CNN candidate.** The same small CNN, fed only the central 3x3 block of each existing 33x33 patch (cropped inside the model, so the dataset, the held-out extraction and the AOI tiling stay as they are), without the pooling layers a 3x3 input cannot support.
 - **Its hyperparameters selected on validation**, with the same grid, seeds, truncation rule and `ddof=1` as `phase1-hyperparameter-selection`.
-- **Patch-size rule, pre-registered** (design D3): the 3x3 CNN becomes the operational classifier unless the 33x33 CNN beats it on validation by more than their pooled standard deviation. The 3x3 design is the default because it is the tutor's.
+- **Patch-size rule, pre-registered** (design D3): the 3x3 CNN becomes the operational classifier unless the 33x33 CNN beats it on validation by more than their pooled standard deviation. 3x3 is the default because it is the simpler input (see the correction above).
 - **Test and held-out reported once** for the operational model; the 3x3 and 33x33 CNNs are both reported on test, for the record.
 - **Downstream cascade** if the operational CNN changes (design D5), including a redraw of the AOI reference sample.
 
