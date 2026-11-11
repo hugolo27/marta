@@ -7,6 +7,8 @@ count only if >= 60 m wide). The FREL label is derived from those attributes, ne
 second time. Height can't be seen on imagery, so "indeterminate" is a valid value and the FREL
 label is reported with and without counting it as meeting the 3 m threshold."""
 
+import datetime
+
 DATE_FIELDS = ["label", "crown", "patch", "height", "near_threshold", "narrow_strip", "imagery_source", "imagery_date"]
 LABELS = ("forest", "nonforest")
 CROWN = ("lt10", "10to25", "ge25")
@@ -30,8 +32,8 @@ def parse(row, date):
            "near_threshold": get("near_threshold") in YES, "narrow_strip": get("narrow_strip") in YES}
     pid = row["point_id"]
     # A capture from another year would put a change in the wrong period, which is what this measures
-    if not get("imagery_date").startswith(date):
-        raise ValueError(f"{pid} {date}: imagery_date={get('imagery_date')!r} is not from {date}, leave the label empty")
+    if not is_date_in(get("imagery_date"), date):
+        raise ValueError(f"{pid} {date}: imagery_date={get('imagery_date')!r} is not a {date}-MM-DD date, leave the label empty")
     if label not in LABELS or rec["crown"] not in CROWN:
         raise ValueError(f"{pid} {date}: label={label!r} crown={rec['crown']!r}")
     if rec["crown"] != "lt10" and (rec["patch"] not in PATCH or rec["height"] not in HEIGHT):
@@ -39,6 +41,13 @@ def parse(row, date):
     if (label == "forest") != meets_cdm(rec):
         raise ValueError(f"{pid} {date}: label={label} contradicts crown/patch/height {rec['crown']}/{rec['patch']}/{rec['height']}")
     return rec
+
+
+def is_date_in(value, year):
+    try:
+        return datetime.date.fromisoformat(value).year == int(year) and len(value) == 10
+    except ValueError:
+        return False
 
 
 def meets_cdm(rec):

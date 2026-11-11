@@ -134,7 +134,7 @@ function panelHtml(date, row) {
     <div class="row"><span class="k">Copa</span>${radios(`crown_${date}`, CROWN, g("crown"))}</div>
     <div class="row"><span class="k">Cerca del umbral</span><input type="checkbox" id="near_${date}" ${g("near_threshold") ? "checked" : ""}> <span class="muted">2-3 o 6-7 cruces</span></div>
     <div class="row"><span class="k">Parche</span>${radios(`patch_${date}`, PATCH, g("patch"))}</div>
-    <div class="row"><span class="k">Altura</span>${radios(`height_${date}`, HEIGHT, g("height") || "indeterminate")}</div>
+    <div class="row"><span class="k">Altura</span>${radios(`height_${date}`, HEIGHT, g("height"))}</div>
     <div class="row"><span class="k">Cortina &lt;60 m</span><input type="checkbox" id="strip_${date}" ${g("narrow_strip") ? "checked" : ""}></div>
     <div class="row"><span class="k">Fuente / fecha</span>
       <select id="src_${date}">${["esri_wayback", "google_earth", "other"].map((s) => `<option ${s === (g("imagery_source") || "esri_wayback") ? "selected" : ""}>${s}</option>`).join("")}</select>

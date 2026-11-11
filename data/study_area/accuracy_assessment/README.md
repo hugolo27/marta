@@ -16,6 +16,7 @@ VM0007 requires of the case-study project's own monitoring.
 | `aoi_sample_strata.json` | stratum sizes and map-class areas | **No** |
 | `heldout_<region>_map.csv` | what the CNN predicted at each held-out point | **No** |
 | `aoi_repeat.csv`, `aoi_adjudication.csv` | blind repeat of a 20% subset and the resolved disagreements | after the first pass |
+| `<sample>_repeat_key.csv` | which first-pass point each repeat id is | **No**, until the repeat is labeled |
 
 Opening a "No" file before labeling is finished breaks the blindness the whole assessment relies
 on. If it happens, note it here; don't hide it.
@@ -95,8 +96,8 @@ estimated loss went from 82 ha mapped to roughly 1,800-2,600 ha, entirely from n
 
 ## Consistency check (blind repeat)
 
-After the first pass, `aoi_repeat.csv` gets a random 20% of the points with empty fields
-(`27_draw_reference_sample.py repeat`). A second person labels them (preferred: the main interpreter
+After the first pass, `aoi_repeat.csv` gets a random 20% of the points with empty fields and new
+ids (`27_draw_reference_sample.py repeat`); `aoi_repeat_key.csv` maps them back for adjudication. A second person labels them (preferred: the main interpreter
 also built the classifier), or the same person at least 14 days later, in shuffled order, without
 looking at the first pass. Disagreements go into `aoi_adjudication.csv` with columns
 `point_id,date,label,crown,patch,height,near_threshold,narrow_strip,reason` (only the fields that

@@ -22,7 +22,8 @@ Writes three files to data/study_area/accuracy_assessment/:
 Point ids are shuffled so their order doesn't give the strata away either.
 
 `repeat` (after the first labeling pass) draws a random 20% of every *_sample.csv in the folder
-into a *_repeat.csv with empty labels, for the blind consistency check.
+into a *_repeat.csv with empty labels and new ids, for the blind consistency check; the
+*_repeat_key.csv that maps them back is not opened while labeling.
 Usage: .venv/bin/python scripts/27_draw_reference_sample.py [repeat]"""
 
 import csv
@@ -219,12 +220,19 @@ def draw_repeat():
             columns, rows = reader.fieldnames, list(reader)
         picked = rng.choice(len(rows), size=max(1, round(REPEAT_FRACTION * len(rows))), replace=False)
         out = path.with_name(path.name.replace("_sample.csv", "_repeat.csv"))
+        key = path.with_name(path.name.replace("_sample.csv", "_repeat_key.csv"))
+        # New ids, so a repeated point can't be looked up in the first pass; the key joins them back
+        repeat_ids = [f"R{k + 1:03d}" for k in range(len(picked))]
         with open(out, "w", newline="") as f:
             w = csv.DictWriter(f, fieldnames=columns)
             w.writeheader()
-            for i in picked:
-                w.writerow({"point_id": rows[i]["point_id"], "lon": rows[i]["lon"], "lat": rows[i]["lat"]})
-        print(f"saved: {out} ({len(picked)} of {len(rows)} points)")
+            for rid, i in zip(repeat_ids, picked):
+                w.writerow({"point_id": rid, "lon": rows[i]["lon"], "lat": rows[i]["lat"]})
+        with open(key, "w", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(["repeat_id", "point_id"])
+            w.writerows((rid, rows[i]["point_id"]) for rid, i in zip(repeat_ids, picked))
+        print(f"saved: {out} ({len(picked)} of {len(rows)} points), {key.name}")
 
 
 if __name__ == "__main__":
