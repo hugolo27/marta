@@ -118,22 +118,47 @@ def autocorrelation_range_m():
     return max(fits[y]["fits"][v]["practical_range_m"] for y in ("2019", "2023") for v in ("ndvi", "class"))
 
 
-def tiles_near(rows, targets, distance):
+@lru_cache(maxsize=None)
+def _to_21s(epsg):
+    from pyproj import Transformer
+    return Transformer.from_crs(f"EPSG:{epsg}", "EPSG:32721", always_xy=True).transform
+
+
+def tile_footprint(row, tile_m=TILE_M):
+    """A tile's footprint, drawn in its own UTM zone and moved to 21S, since the area spans 20S and
+    21S. tile_m is the side in meters, so 288 px tiles around the same centers can be buffered too."""
+    from shapely import box
+    from shapely.ops import transform
+
+    x0, y0 = float(row["x0"]), float(row["y0"])
+    center_x, center_y = x0 + TILE_M / 2, y0 - TILE_M / 2
+    return transform(_to_21s(row["epsg"]), box(center_x - tile_m / 2, center_y - tile_m / 2, center_x + tile_m / 2, center_y + tile_m / 2))
+
+
+def tiles_near(rows, targets, distance, tile_m=TILE_M):
     """Paths of the tiles in rows whose footprint comes within distance (m) of any target tile's
-    footprint, edge to edge (phase1-segmentation D2 buffer). Footprints are drawn in each tile's own
-    UTM zone and their corners moved to 21S, since the area spans 20S and 21S."""
+    footprint, edge to edge (phase1-segmentation D2 buffer)."""
+    from shapely import STRtree
+
+    tree = STRtree([tile_footprint(r, tile_m) for r in targets])
+    return {r["path"] for r in rows if len(tree.query(tile_footprint(r, tile_m), predicate="dwithin", distance=distance))}
+
+
+def tiles_near_heldout(rows, distance, tile_m=TILE_M):
+    """Paths of the tiles in rows whose footprint comes within distance (m) of a held-out rectangle,
+    edge to edge (D2, amended 2026-11-10). The rectangles' edges are densified before moving them to
+    21S, so they stay lines of constant longitude and latitude."""
+    import importlib
     from pyproj import Transformer
     from shapely import STRtree, box
     from shapely.ops import transform
 
-    to_21s = {e: Transformer.from_crs(f"EPSG:{e}", "EPSG:32721", always_xy=True).transform for e in ("32720", "32721")}
-
-    def footprint(r):
-        x0, y0 = float(r["x0"]), float(r["y0"])
-        return transform(to_21s[r["epsg"]], box(x0, y0 - TILE_M, x0 + TILE_M, y0))
-
-    tree = STRtree([footprint(r) for r in targets])
-    return {r["path"] for r in rows if len(tree.query(footprint(r), predicate="dwithin", distance=distance))}
+    regions = importlib.import_module("08_assemble_dataset").HELDOUT_REGIONS
+    to_21s = Transformer.from_crs("EPSG:4326", "EPSG:32721", always_xy=True).transform
+    boxes = [transform(to_21s, box(lon - dlon, lat - dlat, lon + dlon, lat + dlat).segmentize(0.01))
+             for (lon, lat), (dlon, dlat) in ((r["center"], r["half_width_deg"]) for r in regions.values())]
+    tree = STRtree(boxes)
+    return {r["path"] for r in rows if len(tree.query(tile_footprint(r, tile_m), predicate="dwithin", distance=distance))}
 
 
 @lru_cache(maxsize=None)

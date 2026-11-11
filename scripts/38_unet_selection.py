@@ -65,11 +65,12 @@ def balanced_split():
     closest to validation's share of all labeled cells (stratified splits, Kohavi 1995; repeated block
     allocation, Valavi et al., 2019). Cells, not the tile's center class: Dice is scored on cells, and
     tiles centered on cultivo are often mostly another class. Replaces the pilot's 10% floor, which
-    had no source. Pool tiles within the autocorrelation range of a test tile, and then training
-    tiles within it of a validation tile, are left out ("buffer")."""
+    had no source. Tiles within the autocorrelation range of a held-out region, pool tiles within it
+    of a test tile, and then training tiles within it of a validation tile, are left out ("buffer")."""
     rows = dl.load_tile_manifest()
-    reserve = [r for r in rows if r["group"] == "reserve"]
-    pool, _ = pilot.drop_near([r for r in rows if r["group"] == "pool"], reserve)
+    near_heldout = dl.tiles_near_heldout(rows, dl.autocorrelation_range_m())
+    reserve = [r for r in rows if r["group"] == "reserve" and r["path"] not in near_heldout]
+    pool, _ = pilot.drop_near([r for r in rows if r["group"] == "pool" and r["path"] not in near_heldout], reserve)
     n_val = pilot_decisions()["val_blocks_used"]
     best = None
     for seed in range(42, 42 + SPLIT_DRAWS):
@@ -90,6 +91,7 @@ def balanced_split():
     split = best.pop("split")
     SPLIT_PATH.write_text(json.dumps(split, indent=1))
     best["counts"] = {g: list(split.values()).count(g) for g in ("train", "val", "test", "buffer")}
+    best["near_heldout"] = len(near_heldout)
     (OUT_DIR / "split_stats.json").write_text(json.dumps(best, indent=2))
     print(json.dumps(best, indent=1))
 
@@ -166,9 +168,13 @@ def best(rows, tie_key):
     return min([r for r in rows if r["mean"] == top], key=tie_key)
 
 
-def score():
+def check_preregistration():
     if hashlib.sha256(preregistered_text().encode()).hexdigest() != json.loads(PREREG_PATH.read_text())["sha256"]:
-        sys.exit("README changed since pre-registration -- refusing to score")
+        sys.exit("README changed since pre-registration -- refusing to run")
+
+
+def score():
+    check_preregistration()
     data, decisions = splits(), pilot_decisions()
     patience = decisions["patience"] or decisions["max_epochs"]
     results = json.loads(RESULTS_PATH.read_text()) if RESULTS_PATH.exists() else {}
@@ -199,6 +205,7 @@ def score():
 
 
 def test():
+    check_preregistration()
     results = json.loads(RESULTS_PATH.read_text())
     if "test" in results:
         sys.exit("test already run once")

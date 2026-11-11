@@ -112,7 +112,9 @@ entero fuera de las regiones reservadas.
 *Medición a 30 m.* La U-Net predice a 10 m, pero sus probabilidades se promedian en cada bloque
 de 3×3 y tanto el entrenamiento como la evaluación se hacen a 30 m, la resolución real de la
 etiqueta. Los píxeles de clases fuera de las tres (agua, pastizal natural, urbano) no cuentan
-ni al entrenar ni al medir, como los píxeles _void_ de Cityscapes @cordts2016cityscapes. El
+ni al entrenar ni al medir, como los píxeles _void_ de Cityscapes @cordts2016cityscapes. Al
+clasificar el AOI no se enmascaran: el modelo responde bosque, pasto o cultivo en todas partes,
+y eso queda declarado como limitación (son el 0,6 % de las celdas de entrenamiento). El
 Random Forest clasifica cada celda de 30 m con el promedio de su bloque de 3×3 y se mide sobre
 las mismas celdas.
 
@@ -167,7 +169,7 @@ compara #cite(<kohavi1995study>, form: "prose"). Las cuatro dicen que faltan rec
 paciencia (17 a 24), el tope de épocas (100 o 300) y la muestra del Random Forest (25.000 a
 200.000 celdas) se mueven, así que se mantienen las del 80/20 y se informa el rango. La cantidad
 inicial de 2.000 recortes tampoco tenía fuente: se fija midiendo con la curva de aprendizaje
-@ning2020training. Se descargó una segunda tanda y hoy hay 3.852 recortes, 687 de ellos en la
+@ning2020training. Se descargó una segunda tanda y quedaron 3.852 recortes, 687 de ellos en la
 reserva de test (333 bloques). El Random Forest a 30 m llegó a 0,821 con 25.000 celdas por
 árbol, cerca de la mejor U-Net del piloto (0,827).
 
@@ -178,7 +180,12 @@ sus centros a menos de 2,7 km, así que podían compartir terreno. Desde el terc
 afuera todo recorte que tenga algún píxel a menos de 5.161 m (el mayor alcance medido en los
 semivariogramas) de un recorte de otra partición @roberts2017crossvalidation: primero los del
 resto cerca de test y, después de sortear validación, los de entrenamiento cerca de validación.
-Cuesta caro: de 3.165 recortes fuera de test quedan 1.552 para entrenar y 502 para validar.
+Cuesta caro: en el tercer piloto, de 3.165 recortes fuera de test quedaron 1.552 para entrenar
+y 502 para validar. La misma distancia se aplica a las tres regiones reservadas: al construir los
+recortes solo se los había mantenido fuera de las cajas, y una revisión de independencia
+(10 de noviembre de 2026) encontró 23 recortes de entrenamiento, validación o test a menos de
+5.161 m, el más cercano a 1.397 m. En la partición final, con los 5.749 recortes, quedan 2.089
+para entrenar, 671 para validar y 981 para test; 2.008 quedan afuera por la separación.
 
 *Tercer piloto y reglas congeladas.* El tercer piloto repite el primero con todos los recortes,
 con la separación anterior y con dos correcciones del código (una clase ausente de la referencia
@@ -202,7 +209,9 @@ configuraciones, la que menos pérdida falsa deja en el AOI sin perder más de l
 pérdida confirmada en un área de desarrollo con deforestación real. Con la CNN final
 quedó elegida confianza ≥ 0,9 en ambas fechas, persistencia en 2022 y unidad mínima de
 mapeo: pérdida mapeada de 8,1 ha. (Con CNN anteriores, la misma regla había dejado 81,9 ha
-y 7,6 ha.)
+y 7,6 ha.) Para la U-Net la regla cambia en un punto: la pérdida falsa se mide en el bosque
+estable confirmado del área de desarrollo y no en el AOI, para que el AOI, donde se evalúa la
+exactitud, no intervenga en la elección del filtro. La regla nueva se registra antes de puntuar.
 
 *Evaluación contra referencia independiente.* La exactitud medida hasta ahí es acuerdo con
 otros mapas, no con el terreno. El test final usa la vara que el propio proyecto del caso

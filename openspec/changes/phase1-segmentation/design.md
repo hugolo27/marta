@@ -45,6 +45,7 @@ See proposal.md. Current state (phase1-dataset-v2): 5,993 patches of 33x33x26 wi
 - Final split (after the pilot): test = every reserve block, validation = the pilot's size in pool blocks, rest training. Of 100 random draws (blockCV's default, Valavi et al., 2019), the one whose share of each class's labeled 30 m cells in validation is closest to validation's share of all labeled cells (stratification, Kohavi, 1995; cells rather than center class, since Dice is scored on cells). Replaces a "10% of each class" floor that had no source.
 - Same 6 km blocks, assigned regardless of class. When the tiles are built, a pool point within the tile diagonal (192 px: 2.7 km) of a reserve point is dropped; nothing kept training and validation tiles apart, and in the first pilot 75 pairs had centers closer than 2.7 km.
 - **Buffer** (from pilot 3 on): a tile is left out if any of its pixels lies within the autocorrelation range of a tile of a split it must be kept apart from (Roberts et al., 2017): first pool tiles near the test reserve, then, after validation is drawn, training tiles near validation. Range = the largest practical range of the four semivariograms, 5,161 m (95% of the sill, the largest as for the block side). Distance edge to edge between footprints, corners moved to UTM 21S. With 6 km blocks it costs a lot: of 3,165 pool tiles, 727 go near the reserve and 384 more near a 20% validation.
+- **Held-out regions** (amended 2026-11-10, after an independence audit against the TFM scope in `docs/FOUNDATION.md`): a tile within the same 5,161 m of a held-out rectangle, edge to edge, is left out as well. Tile building only kept footprints out of the rectangles (half the tile diagonal), so 23 train, validation or test tiles were closer than the range, the nearest at 1,397 m.
 - The split proportions come from the pilot (D4), not from 70/15/15.
 
 ### D3. Model and metric
@@ -75,7 +76,8 @@ See proposal.md. Current state (phase1-dataset-v2): 5,993 patches of 33x33x26 wi
 - Written in `data/study_area/unet_selection/README.md` above `## Results`, hashed and logged to MLflow before scoring. Test once after the decision.
 
 ### D6. Cascade
-- AOI and development area 2019-2023 classified by overlapping tiles (half-tile overlap, probabilities averaged), then the change-map rule as before.
+- AOI and development area 2019-2023 classified by overlapping tiles (half-tile overlap, probabilities averaged), then the change-map rule as before, with one change (amended 2026-11-10, same audit as D2): step 2 measures false loss on the development area's confirmed stable forest instead of the AOI, so the AOI, where accuracy is assessed, plays no part in choosing the filter. The amended rule is hashed and logged to MLflow before scoring.
+- Cells of other classes (water, wetland, natural grassland; 0.6% of the training cells) are not masked: the model answers bosque, pasto or cultivo everywhere, and this is reported as a limitation (decided 2026-11-10).
 - Held-out regions re-run at 30 m against MapBiomas.
 - Grad-CAM for segmentation (Vinogradova et al., 2020): the gradient of the class score summed over a region of the output.
 - Redrawn AOI reference sample, as in phase1-dataset-v2.
