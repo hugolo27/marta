@@ -16,7 +16,8 @@ else from the pilot is reused; its models were discarded.
 ## Split
 
 `38_unet_selection.py split`, run before this README is hashed: tiles within the autocorrelation
-range (5,161 m, edge to edge) of a held-out region are left out (added 2026-11-10, design D2);
+range (5,161 m, edge to edge) of a held-out region (added 2026-11-10) or of the case-study AOI
+(added 2026-11-12) are left out (design D2);
 test = every block of the reserve; pool tiles within that range of a test tile are left out;
 validation = the pilot's validation size in blocks of the remaining pool; training tiles within
 that range of a validation tile are left out; the rest is training. Tiles left out are marked
