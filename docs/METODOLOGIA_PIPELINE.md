@@ -85,12 +85,30 @@ dato, cómo se procesa y para qué se usa el resultado.
 | Fuente | Qué es | Cobertura temporal/espacial | Por qué esta fuente y no una alternativa |
 |---|---|---|---|
 | **Sentinel-2 L2A** (Copernicus/ESA) | Imágenes multiespectrales, 12 bandas en L2A (B10 solo existe en L1C) más NDVI calculado, 10 m de resolución nativa, revisita nominal de 5 días | Global; en este proyecto, usable de forma densa desde 2019 sobre el área de trabajo (chequeo empírico: 14 escenas en 2018 contra 73 en 2019 sobre el mismo polígono) | Resolución más fina que Landsat (30 m) y acceso a bandas red-edge/SWIR que un RGB simple no tiene. Se usa L2A (reflectancia de superficie) y no L1C (tope de atmósfera, sin corregir) por tres razones concretas: (1) la comparación temporal 2019 vs. 2023 necesita que los valores de reflectancia sean comparables entre fechas: con L1C, condiciones atmosféricas distintas en cada fecha meterían diferencias que no son cambio real de cobertura; (2) NDVI y otros índices espectrales solo son físicamente válidos sobre reflectancia de superficie, no sobre valores distorsionados por dispersión atmosférica; (3) MapBiomas (la etiqueta) ya sale de reflectancia de superficie de Landsat corregida, y usar L2A mantiene la misma magnitud física de ambos lados del par imagen-etiqueta |
-| **MapBiomas Chaco, Colección 5** | Clasificación de cobertura de suelo, un raster por año (1985-2023, 39 capas), 30 m, derivado de Landsat | Gran Chaco americano; en este proyecto, recortado a Paraguay | Es el único producto abierto con clasificación anual a escala de bioma y con suficiente profundidad histórica para modelar tendencia. Además evita tener que digitalizar el ground truth a mano, algo inviable en el volumen que pide entrenar un clasificador |
+| **MapBiomas Chaco, Colección 5** | Clasificación de cobertura de suelo, un raster por año (1985-2023, 39 capas), 30 m, derivado de Landsat | Gran Chaco americano; en este proyecto, recortado a Paraguay | Etiqueta de entrenamiento. Se usa la colección del bioma porque el área de estudio es el Chaco: tiene leyenda y muestras propias del Gran Chaco, y profundidad histórica para modelar tendencia. Además evita digitalizar el ground truth a mano, algo inviable en el volumen que pide entrenar un clasificador. MapBiomas Paraguay no se evaluó como alternativa al elegirla; se compara después (ver abajo) |
+| **MapBiomas Paraguay, Colección 3** | Clasificación de cobertura de suelo, un raster por año (1985-2025), 30 m, derivado de Landsat | Todo Paraguay (Región Occidental y Oriental) | No entra al entrenamiento. Es la referencia nacional del monitoreo de cobertura y se usa como segunda referencia de comparación (ver abajo) |
 | **ESA WorldCover v200** | Cobertura de suelo global, 10 m, año de referencia 2021 | Global | Su resolución nativa coincide con la de Sentinel-2, a diferencia de MapBiomas (30 m). Se usa solo como verificación independiente sobre un área que nunca entra en entrenamiento; mezclarlo con las etiquetas de entrenamiento sería circular |
 | **ETH Global Canopy Height** (Lang, Jetz, Schindler y Wegner, 2023, *Nature Ecology & Evolution*) | Modelo pre-entrenado que infiere altura de dosel a partir de Sentinel-2, con capa de incertidumbre propia, año base 2020 | Global | Se prefirió sobre la alternativa Potapov/GLAD (UMD) porque entrega altura e incertidumbre en bruto y deja la calibración a biomasa como un paso propio, auditable, en vez de heredar una calibración ya resuelta por terceros |
 | **GEDI L4A** (`GEDI_L4A_AGB_Density_V3`, NASA/ORNL DAAC) | Densidad de biomasa aérea medida por lidar espacial, punto por punto | Abril 2019 a marzo 2023 sobre el AOI del caso de estudio (39 gránulos, 3.823 footprints de calidad tras filtrar por `l4a_quality_flag_rel3`, unos 18,6 footprints de calidad cada 100 ha) | Es la referencia estándar de biomasa aérea satelital, revisada por pares, y es el mismo dato contra el cual el propio modelo ETH fue validado en su publicación original |
 | **FAO GAUL 2015, nivel 1** | Límites administrativos oficiales por país y departamento | Paraguay: Alto Paraguay, Boquerón y Presidente Hayes (Región Occidental) | Ya está disponible como asset nativo en Google Earth Engine, así que define la huella de muestreo ampliada (sección 2) sin necesitar un archivo geoespacial aparte |
 | **Variables explicativas para el modelo predictivo** (distancia a red vial, distancia al borde de cambio observado, pendiente del terreno, tenencia de tierra o estatus de área protegida) | Capas de contexto geográfico, no series de cobertura | Pendiente de definición final | La distancia al borde de cambio se puede derivar directamente de la propia serie MapBiomas. Red vial y pendiente tienen fuentes estándar (OpenStreetMap, SRTM) que todavía no se incorporaron. Tenencia de tierra y área protegida no tienen fuente identificada por ahora: queda como pendiente explícito, no resuelto por omisión |
+
+**Comparación con MapBiomas Paraguay.** El entrenamiento usa MapBiomas Chaco Colección 5; el
+resultado se compara contra MapBiomas Paraguay Colección 3 para tres cosas:
+
+- Medir cuánto depende el resultado de la fuente de etiquetas. Las dos colecciones cubren el área
+  de estudio, pero son clasificaciones distintas, con leyendas, muestras y años de colección
+  propios. Que sean casi iguales no está verificado: se mide.
+- Robustez. Si la pérdida de bosque 2019-2023 sale parecida con las dos, la conclusión no depende
+  de haber elegido MapBiomas Chaco. Si difieren, la diferencia cuantifica la incertidumbre de las
+  etiquetas, que se arrastra a la estimación de carbono.
+- Producto nacional. MapBiomas Paraguay cubre todo el país y es la referencia nacional.
+
+Cómo se hace: las dos colecciones se evalúan contra la misma muestra de referencia independiente,
+etiquetada a ciegas sobre imágenes de alta resolución (AOI en 2019 y 2023, regiones reservadas en
+2023), con el estimador de Stehman (2014) y la pérdida ajustada con intervalo de confianza
+(Olofsson et al., 2014). El entrenamiento no cambia. Pendiente en el change
+`phase1-accuracy-assessment`.
 
 **Nota sobre los "niveles" de procesamiento (L1C, L2A, L4A).** El concepto general de niveles
 (0 a 4: dato crudo → calibrado → variable geofísica derivada → grilla uniforme → producto de
