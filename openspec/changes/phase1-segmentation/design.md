@@ -75,6 +75,7 @@ See proposal.md. Current state (phase1-dataset-v2): 5,993 patches of 33x33x26 wi
 - Edge rule, both directions on every axis, once: `lr` 0.00003 or 0.003, batch 4 or 64. Tile 48 cannot go lower (the U-Net would have fewer than 4 levels at 4 px); tile 192 still winning after that stops the selection before it is saved, and 288 px tiles are extracted around the same centers, with the buffer recomputed on their footprints and the score on the same 192 px cells. Basis: a best point near the boundary of the search space suggests a better one beyond it (Godbole et al., 2023, practitioner guide); the step repeats the grid spacing (x3 `lr`, x2 batch), a convention.
 - Training windows (from the selection on): one window of the configuration's tile size per tile and epoch, drawn anywhere on the tile's 30 m grid, with channel statistics over the whole tiles (Isensee et al., 2021). With the center crop the pilots used, a 48 px configuration would train on 1/16 of the labeled cells a 192 px one sees and the grid would mix context with amount of data (found in the code review of 2026-11-04).
 - U-Net vs. RF on validation: the U-Net counts as better only if its macro Dice beats RF's by more than their pooled standard deviation. Which one becomes operational follows the existing requirement "Operational classifier selection".
+- Hardware (added 2026-11-13, before hashing): all selection and test runs on one device model, since PyTorch does not guarantee the same result for the same seed across platforms (PyTorch, Reproducibility). `38` saves the device in `results.json` and stops on another one; if the model becomes unavailable, the selection starts again on the new one, never mixing runs.
 - Written in `data/study_area/unet_selection/README.md` above `## Results`, hashed and logged to MLflow before scoring. Test once after the decision.
 
 ### D6. Cascade
@@ -105,6 +106,7 @@ See proposal.md. Current state (phase1-dataset-v2): 5,993 patches of 33x33x26 wi
 - Ning, H., et al. (2020). Choosing an appropriate training set size. Annals of GIS 26(4), 329-342. https://doi.org/10.1080/19475683.2020.1803402
 - Roberts, D. R., et al. (2017). Cross-validation strategies for data with temporal, spatial, hierarchical, or phylogenetic structure. Ecography 40(8), 913-929. https://doi.org/10.1111/ecog.02881
 - Prechelt, L. (1998). Early stopping - but when? LNCS 1524, 55-69. https://doi.org/10.1007/3-540-49430-8_3
+- PyTorch. Reproducibility. https://docs.pytorch.org/docs/stable/notes/randomness.html
 - Ronneberger, O., et al. (2015). U-Net. MICCAI, 234-241. https://doi.org/10.1007/978-3-319-24574-4_28
 - Valavi, R., et al. (2019). blockCV. Methods in Ecology and Evolution 10(2), 225-232. https://doi.org/10.1111/2041-210X.13107
 - Vinogradova, K., et al. (2020). Towards interpretable semantic segmentation via gradient-weighted class activation mapping. AAAI 34(10), 13943-13944. https://doi.org/10.1609/aaai.v34i10.7244

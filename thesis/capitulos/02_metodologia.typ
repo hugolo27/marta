@@ -198,10 +198,17 @@ y de la predicción ya no suma un Dice de 1, y validación se mide sobre el reco
 cada piloto ajustó el diseño del siguiente, su documento registrado fija de una vez todas las
 reglas que quedan: la partición final, la selección y el test. Un cambio posterior pasa a ser
 una enmienda con fecha. Dos de esas reglas son convenciones declaradas. El tamaño de validación
-no puede superar el del piloto (229 bloques), porque con la separación una validación más
+no puede superar el de la validación provisoria del piloto (291 bloques tras la tercera tanda,
+según una enmienda del 23 de octubre de 2026), porque con la separación una validación más
 grande le quita recortes al entrenamiento y la selección entrenaría con menos datos de los que
 usó el piloto para medir sus reglas. Si la curva sigue subiendo, se descarga a lo sumo una
-tanda más, y después se sigue igual y se informa como limitación.
+tanda más, y después se sigue igual y se informa como limitación. Con la tercera tanda (5.749
+recortes) la curva todavía sube (0,772, 0,797, 0,807 y 0,815 con el 25, 50, 75 y 100 %), así que
+no se descargan más y se informa como limitación; quedan una paciencia de 16 épocas, un tope de
+100 y 25.000 celdas por árbol. La última regla fija el hardware: la misma semilla no garantiza el
+mismo resultado en otra plataforma @pytorchreproducibility, así que toda la selección y el test
+corren en un mismo modelo de GPU, el script se detiene si encuentra otro y, si ese modelo deja de
+estar disponible, la selección se repite entera en el nuevo.
 
 == Detección de cambio y evaluación de exactitud
 

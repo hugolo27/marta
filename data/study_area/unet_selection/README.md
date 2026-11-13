@@ -76,4 +76,15 @@ which had no source. Output: `final_split.json` and `split_stats.json` in this f
   is used for nothing else. The U-Net is trained with the epoch cap its selection ended with (3
   times the pilot's if it was re-run near the cap).
 
+## Hardware
+
+- Every training of the selection and of the test runs on one device model, because PyTorch does
+  not guarantee the same result for the same seed on different platforms (PyTorch documentation,
+  "Reproducibility"), and a gap between configurations has to come from the configurations, not
+  from the machine. `score` saves the device in `results.json` on its first run, and `score` and
+  `test` stop if they find another one, so an interrupted session resumes only on the same model.
+  If that model stops being available, every run done on it is discarded and the selection starts
+  again on the new one; runs from two devices are never mixed. The Random Forest runs in the same
+  process and follows the same rule.
+
 ## Results

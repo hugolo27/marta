@@ -14,12 +14,14 @@ Usage: .venv/bin/python scripts/38_unet_selection.py split|preregister|score|tes
 import hashlib
 import importlib
 import json
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 import mlflow
 import numpy as np
+import torch
 
 import classifier_report
 import dataset_loader as dl
@@ -46,7 +48,8 @@ SPLIT_DRAWS = 100  # blockCV's default number of random block allocations (Valav
 
 def preregistered_text():
     text = README.read_text()
-    return text[:text.index("## Results")]
+    # The heading, not the first mention: the intro quotes "## Results", and the pilots' hashes stopped there
+    return text[:re.search(r"^## Results", text, re.M).start()]
 
 
 def preregister():
@@ -168,6 +171,13 @@ def best(rows, tie_key):
     return min([r for r in rows if r["mean"] == top], key=tie_key)
 
 
+def check_hardware(results):
+    # Same seed, different device, different result (README, Hardware): runs from two devices are never mixed
+    device = torch.cuda.get_device_name(0) if torch.cuda.is_available() else unet.device_name()
+    if results.setdefault("hardware", device) != device:
+        sys.exit(f"results.json was run on {results['hardware']}, not {device}")
+
+
 def check_preregistration():
     if hashlib.sha256(preregistered_text().encode()).hexdigest() != json.loads(PREREG_PATH.read_text())["sha256"]:
         sys.exit("README changed since pre-registration -- refusing to run")
@@ -178,6 +188,7 @@ def score():
     data, decisions = splits(), pilot_decisions()
     patience = decisions["patience"] or decisions["max_epochs"]
     results = json.loads(RESULTS_PATH.read_text()) if RESULTS_PATH.exists() else {}
+    check_hardware(results)
     mlflow.set_experiment(EXPERIMENT_NAME)
     with mlflow.start_run(run_name="selection"):
         print("Random Forest grid (val)")
@@ -209,6 +220,7 @@ def test():
     results = json.loads(RESULTS_PATH.read_text())
     if "test" in results:
         sys.exit("test already run once")
+    check_hardware(results)
     data, decisions = splits(), pilot_decisions()
     sel = results["selection"]
     out = {"unet": [], "rf": []}
