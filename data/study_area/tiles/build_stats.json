@@ -1,0 +1,50 @@
+{
+  "tile_px": 192,
+  "block_km": 6,
+  "center_class_by_group": {
+    "bosque": {
+      "reserve": 384,
+      "pool": 1597
+    },
+    "pasto": {
+      "reserve": 346,
+      "pool": 1564
+    },
+    "cultivo": {
+      "reserve": 256,
+      "pool": 1602
+    }
+  },
+  "tiles": 5749,
+  "dropped_gap": 0,
+  "tiles_by_group": {
+    "pool": 4763,
+    "reserve": 986
+  },
+  "label_px": {
+    "bosque": 11514304,
+    "pasto": 9151286,
+    "cultivo": 2736233,
+    "other": 146081
+  },
+  "ignored_share": 0.0062,
+  "batches": {
+    "1": {
+      "points_sampled": 2004,
+      "dropped_overlap": 64
+    },
+    "2": {
+      "points_sampled": 2004,
+      "dropped_overlap": 92
+    },
+    "3": {
+      "points_sampled": 2004,
+      "dropped_overlap": 107
+    }
+  },
+  "tiles_by_batch": {
+    "1": 1940,
+    "2": 1912,
+    "3": 1897
+  }
+}
