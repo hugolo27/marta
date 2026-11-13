@@ -98,6 +98,7 @@ IGNORE = -1
 TILE_M = 192 * 10
 AUTOCORRELATION_PATH = REPO_ROOT / "data" / "study_area" / "spatial_autocorrelation" / "results.json"
 AOI_PATH = REPO_ROOT / "data" / "study_area" / "aoi.geojson"
+DEV_AREA_PATH = REPO_ROOT / "data" / "study_area" / "change_hardening" / "dev_area.geojson"
 
 
 @lru_cache(maxsize=None)
@@ -146,9 +147,10 @@ def tiles_near(rows, targets, distance, tile_m=TILE_M):
 
 
 def tiles_near_heldout(rows, distance, tile_m=TILE_M):
-    """Paths of the tiles in rows whose footprint comes within distance (m) of a held-out rectangle
-    or of the case-study AOI, edge to edge (D2, amended 2026-11-10 and 2026-11-12). Edges are
-    densified before moving them to 21S, so they stay lines of constant longitude and latitude."""
+    """Paths of the tiles in rows whose footprint comes within distance (m) of a held-out rectangle,
+    the case-study AOI or the change-map development area, edge to edge (D2, amended 2026-11-10,
+    2026-11-12 and 2026-11-13). Edges are densified before moving them to 21S, so they stay lines
+    of constant longitude and latitude."""
     import importlib
     from pyproj import Transformer
     from shapely import STRtree, box
@@ -159,8 +161,8 @@ def tiles_near_heldout(rows, distance, tile_m=TILE_M):
     to_21s = Transformer.from_crs("EPSG:4326", "EPSG:32721", always_xy=True).transform
     boxes = [transform(to_21s, box(lon - dlon, lat - dlat, lon + dlon, lat + dlat).segmentize(0.01))
              for (lon, lat), (dlon, dlat) in ((r["center"], r["half_width_deg"]) for r in regions.values())]
-    aoi = shape(json.loads(AOI_PATH.read_text())["features"][0]["geometry"])
-    tree = STRtree(boxes + [transform(to_21s, aoi.segmentize(0.01))])
+    areas = [shape(json.loads(p.read_text())["features"][0]["geometry"]) for p in (AOI_PATH, DEV_AREA_PATH)]
+    tree = STRtree(boxes + [transform(to_21s, a.segmentize(0.01)) for a in areas])
     return {r["path"] for r in rows if len(tree.query(tile_footprint(r, tile_m), predicate="dwithin", distance=distance))}
 
 

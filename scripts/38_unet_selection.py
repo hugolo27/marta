@@ -65,8 +65,8 @@ def balanced_split():
     closest to validation's share of all labeled cells (stratified splits, Kohavi 1995; repeated block
     allocation, Valavi et al., 2019). Cells, not the tile's center class: Dice is scored on cells, and
     tiles centered on cultivo are often mostly another class. Replaces the pilot's 10% floor, which
-    had no source. Tiles within the autocorrelation range of a held-out region or the AOI, pool tiles within it
-    of a test tile, and then training tiles within it of a validation tile, are left out ("buffer")."""
+    had no source. Tiles within the autocorrelation range of a held-out region, the AOI or the change-map
+    development area, pool tiles within it of a test tile, and then training tiles within it of a validation tile, are left out ("buffer")."""
     rows = dl.load_tile_manifest()
     near_heldout = dl.tiles_near_heldout(rows, dl.autocorrelation_range_m())
     reserve = [r for r in rows if r["group"] == "reserve" and r["path"] not in near_heldout]

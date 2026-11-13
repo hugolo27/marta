@@ -184,8 +184,13 @@ Cuesta caro: en el tercer piloto, de 3.165 recortes fuera de test quedaron 1.552
 y 502 para validar. La misma distancia se aplica a las tres regiones reservadas: al construir los
 recortes solo se los había mantenido fuera de las cajas, y una revisión de independencia
 (10 de noviembre de 2026) encontró 23 recortes de entrenamiento, validación o test a menos de
-5.161 m, el más cercano a 1.397 m. En la partición final, con los 5.749 recortes, quedan 2.089
-para entrenar, 671 para validar y 981 para test; 2.008 quedan afuera por la separación.
+5.161 m, el más cercano a 1.397 m. La misma revisión extendió la regla al AOI del caso de
+estudio, donde se evalúa la precisión (6 recortes de entrenamiento y 2 de test estaban a menos de
+esa distancia), y al área de desarrollo, donde se elige el filtro del mapa de cambio (un recorte
+de entrenamiento, en 2019 y 2023, estaba adentro). En la partición final, con los 5.749 recortes,
+quedan 1.973 para entrenar, 655 para validar y 975 para test; 2.146 quedan afuera por la
+separación. Un chequeo independiente confirma que ningún recorte usado queda a menos de 5.161 m de
+otra partición, de las regiones reservadas, del AOI o del área de desarrollo.
 
 *Tercer piloto y reglas congeladas.* El tercer piloto repite el primero con todos los recortes,
 con la separación anterior y con dos correcciones del código (una clase ausente de la referencia

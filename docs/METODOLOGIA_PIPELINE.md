@@ -193,6 +193,14 @@ Sentinel-2: la huella de muestreo cruza dos husos UTM (20S y 21S), y forzar toda
 huso arbitrario distorsionaría los puntos alejados de esa zona. La correspondencia exacta 3×3 se
 demuestra de forma acotada sobre el AOI del caso de estudio, que sí queda dentro de un único huso.
 
+Para la segmentación (U-Net, recortes de 192 px) la separación es la misma distancia, 5.161 m borde
+a borde: se deja afuera todo recorte que quede a menos de esa distancia de un recorte de otra
+partición, de las tres regiones reservadas, del AOI del caso de estudio (donde se evalúa la
+precisión) o del área de desarrollo del mapa de cambio (donde se elige su filtro). Partición final,
+13 de noviembre de 2026: 1.973 recortes para entrenar, 655 para validar y 975 para test; 2.146 quedan
+afuera. Un chequeo independiente da como mínimo 5.166 m entre particiones y 5.292 m a las zonas
+protegidas (`data/study_area/unet_selection/split_stats.json`).
+
 Los composites de cada período se arman enmascarando nubes por-píxel vía la banda SCL (Scene
 Classification Layer), no por el metadato más grueso de nubosidad por escena. Para 2019: 25 escenas,
 36,4 % de nubosidad promedio por escena, 0 % de hueco residual tras el compositing. Para 2023: 24
