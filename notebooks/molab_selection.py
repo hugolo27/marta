@@ -10,7 +10,7 @@ def _():
     import importlib
     import json
     import os
-    import sqlite3
+    import shutil
     import subprocess
     import sys
     import threading
@@ -18,7 +18,6 @@ def _():
     import zipfile
     from datetime import datetime, timezone
     from pathlib import Path
-    from shutil import copy as shutil_copy
 
     import marimo as mo
     return (
@@ -29,8 +28,7 @@ def _():
         json,
         mo,
         os,
-        shutil_copy,
-        sqlite3,
+        shutil,
         subprocess,
         sys,
         threading,
@@ -43,14 +41,14 @@ def _():
 @app.cell
 def _(mo):
     mo.md(r"""
-    # U-Net selection on molab (phase1-segmentation, tasks 4.2)
+    # U-Net selection on molab (phase1-segmentation, task 4.2)
 
     Runs `scripts/38_unet_selection.py score` on the molab GPU. The rules are the ones pre-registered in
     `data/study_area/unet_selection/README.md`; this notebook only moves files in and out:
 
-    - clones the repo and downloads the 3,603 used tiles from a private Hugging Face dataset;
-    - restores `results.json` and `mlflow.db` from the dataset, so each 12 h session resumes where the last one stopped;
-    - uploads both every time `38` saves a seed.
+    - clones the repo and downloads the 3,603 used tiles from a Google Drive link;
+    - restores `results.json` from the `molab-state` branch, so each 12 h session resumes where the last one stopped;
+    - pushes it back to that branch every time `38` saves a seed.
 
     **prueba** times two epochs per tile size and writes nothing to `results.json`.
     **seleccion** runs the real grid. The first selection session pins the commit, the GPU and the PyTorch
@@ -61,113 +59,118 @@ def _(mo):
 
 @app.cell
 def _(mo):
-    token = mo.ui.text(kind="password", label="Hugging Face token (write)")
-    dataset = mo.ui.text(label="Dataset (user/name)")
+    drive_url = mo.ui.text(label="Drive link to tiles_used.zip", full_width=True)
+    gh_token = mo.ui.text(kind="password", label="GitHub token (contents: write on hugolo27/marta)")
     mode = mo.ui.dropdown(["prueba", "seleccion"], value="prueba", label="Mode")
     start = mo.ui.run_button(label="Run")
-    mo.vstack([token, dataset, mode, start])
-    return dataset, mode, start, token
+    mo.vstack([drive_url, gh_token, mode, start])
+    return drive_url, gh_token, mode, start
 
 
 @app.cell
 def _(Path):
     REPO = Path.home() / "marta"
+    STATE_DIR = Path.home() / "molab-state"
     BRANCH = "feat/phase1-segmentation"
-    TILES_ZIP = "tiles_used.zip"
+    STATE_BRANCH = "molab-state"
+    TILES_ZIP = Path.home() / "tiles_used.zip"
     TILES_SHA256 = "1ab2579a8043b340047490cf7760643263b4f507a7e9c1172a9e8d486139933c"
-    SELECTION_DIR = REPO / "data" / "study_area" / "unet_selection"
-    # Local path -> path in the dataset
-    STATE = {SELECTION_DIR / "results.json": "state/results.json", REPO / "mlflow.db": "state/mlflow.db"}
-    SESSIONS = "state/sessions.json"
-    return BRANCH, REPO, SELECTION_DIR, SESSIONS, STATE, TILES_SHA256, TILES_ZIP
+    RESULTS = REPO / "data" / "study_area" / "unet_selection" / "results.json"
+    return BRANCH, REPO, RESULTS, STATE_BRANCH, STATE_DIR, TILES_SHA256, TILES_ZIP
 
 
 @app.cell
-def _(dataset, mo, start, subprocess, sys, token):
+def _(STATE_DIR, gh_token, mo, start, subprocess, sys):
     mo.stop(not start.value)
-    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "huggingface_hub", "mlflow==3.16.0", "scikit-learn==1.9.0"],
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "gdown", "mlflow==3.16.0", "scikit-learn==1.9.0"],
                    check=True)
-    from huggingface_hub import HfApi, hf_hub_download
-    from huggingface_hub.utils import EntryNotFoundError
+    token = gh_token.value.strip()
+    remote = f"https://x-access-token:{token}@github.com/hugolo27/marta.git"
 
-    api = HfApi(token=token.value)
-    repo_id = dataset.value.strip()
-
-    def fetch(name):
-        try:
-            return hf_hub_download(repo_id, name, repo_type="dataset", token=token.value, force_download=True)
-        except EntryNotFoundError:
-            return None
-
-    def push(local, name):
-        api.upload_file(path_or_fileobj=str(local), path_in_repo=name, repo_id=repo_id, repo_type="dataset",
-                        commit_message=f"Update {name}")
-    return fetch, hf_hub_download, push, repo_id
+    def git(*args, cwd=STATE_DIR):
+        r = subprocess.run(["git", "-c", "user.name=hugolo27", "-c", "user.email=hugolo27@users.noreply.github.com",
+                            *args], cwd=cwd, capture_output=True, text=True)
+        if r.returncode:
+            # The remote URL carries the token
+            raise RuntimeError(f"git {args[0]} failed: {(r.stdout + r.stderr).replace(token, '***')}")
+        return r.stdout.strip()
+    return git, remote
 
 
 @app.cell
 def _(
     BRANCH,
     REPO,
-    SESSIONS,
-    STATE,
+    RESULTS,
+    STATE_BRANCH,
+    STATE_DIR,
     TILES_SHA256,
     TILES_ZIP,
-    fetch,
+    drive_url,
+    git,
     hashlib,
-    hf_hub_download,
     json,
-    repo_id,
-    shutil_copy,
-    subprocess,
-    token,
+    remote,
+    shutil,
     zipfile,
 ):
-    sessions_path = fetch(SESSIONS)
-    sessions = json.loads(open(sessions_path).read()) if sessions_path else []
+    import gdown
+
+    if not STATE_DIR.exists():
+        git("clone", "-q", "--branch", STATE_BRANCH, remote, str(STATE_DIR), cwd=None)
+    git("pull", "-q")
+    sessions_path = STATE_DIR / "sessions.json"
+    sessions = json.loads(sessions_path.read_text()) if sessions_path.exists() else []
+
     if not REPO.exists():
-        subprocess.run(["git", "clone", "--branch", BRANCH, "https://github.com/hugolo27/marta.git", str(REPO)], check=True)
+        git("clone", "-q", "--branch", BRANCH, "https://github.com/hugolo27/marta.git", str(REPO), cwd=None)
     if sessions:
         # Same code for every selection session: the first one pinned the commit
-        subprocess.run(["git", "-C", str(REPO), "checkout", "-q", sessions[0]["commit"]], check=True)
-    commit = subprocess.run(["git", "-C", str(REPO), "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
+        git("checkout", "-q", sessions[0]["commit"], cwd=REPO)
+    commit = git("rev-parse", "HEAD", cwd=REPO)
 
-    zip_path = hf_hub_download(repo_id, TILES_ZIP, repo_type="dataset", token=token.value)
-    with zipfile.ZipFile(zip_path) as z:
-        names = z.namelist()
-        if not all((REPO / n).exists() for n in names):
-            digest = hashlib.sha256()
-            with open(zip_path, "rb") as _f:
-                for chunk in iter(lambda: _f.read(1 << 24), b""):
-                    digest.update(chunk)
-            if digest.hexdigest() != TILES_SHA256:
-                raise ValueError("tiles zip does not match the one built from final_split.json")
-            z.extractall(REPO)
+    if not TILES_ZIP.exists():
+        gdown.download(drive_url.value.strip(), str(TILES_ZIP), fuzzy=True, quiet=False)
+    digest = hashlib.sha256()
+    with open(TILES_ZIP, "rb") as _f:
+        for chunk in iter(lambda: _f.read(1 << 24), b""):
+            digest.update(chunk)
+    if digest.hexdigest() != TILES_SHA256:
+        raise ValueError("tiles zip does not match the one built from final_split.json")
+    with zipfile.ZipFile(TILES_ZIP) as z:
+        z.extractall(REPO)
+        n_tiles = len(z.namelist())
 
-    for local, name in STATE.items():
-        remote = fetch(name)
-        if remote:
-            shutil_copy(remote, local)
-    print(f"commit {commit}, {len(names)} tiles, {len(sessions)} earlier selection sessions")
+    if (STATE_DIR / "results.json").exists():
+        shutil.copy(STATE_DIR / "results.json", RESULTS)
+    print(f"commit {commit}, {n_tiles} tiles, {len(sessions)} earlier selection sessions")
     return commit, sessions
 
 
 @app.cell
-def _(REPO, importlib, sys, torch_info):
-    sys.path.insert(0, str(REPO / "scripts"))
-    selection_script = importlib.import_module("38_unet_selection")
-    unet = selection_script.unet
-    print(torch_info())
-    return selection_script, unet
+def _(STATE_DIR, git, shutil):
+    def push(local, name):
+        shutil.copy(local, STATE_DIR / name)
+        git("add", name)
+        if git("status", "--porcelain"):
+            git("commit", "-q", "-m", f"[docs] Update {name}")
+            git("push", "-q", "origin", "HEAD")
+    return (push,)
 
 
 @app.cell
-def _():
+def _(REPO, commit, importlib, sys):
+    sys.path.insert(0, str(REPO / "scripts"))
+    selection_script = importlib.import_module("38_unet_selection")
+    unet = selection_script.unet
+
     def torch_info():
         import torch
         return {"device": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "no cuda",
                 "torch": torch.__version__, "cuda": torch.version.cuda}
-    return (torch_info,)
+
+    print(commit, torch_info())
+    return selection_script, torch_info, unet
 
 
 @app.cell
@@ -184,16 +187,15 @@ def _(json, mo, mode, push, selection_script, time, torch_info, unet):
         print(f"tile {tile_px}: {probe['seconds_per_epoch'][tile_px]:.1f} s per epoch", flush=True)
     with open("probe.json", "w") as _f:
         json.dump(probe, _f, indent=2)
-    push("probe.json", "state/probe.json")
-    print("probe.json uploaded")
+    push("probe.json", "probe.json")
+    print("probe.json pushed to molab-state")
     return
 
 
 @app.cell
 def _(
     REPO,
-    SESSIONS,
-    STATE,
+    RESULTS,
     commit,
     datetime,
     json,
@@ -202,7 +204,6 @@ def _(
     os,
     push,
     sessions,
-    sqlite3,
     subprocess,
     sys,
     threading,
@@ -217,24 +218,16 @@ def _(
     sessions.append({**info, "commit": commit, "utc": datetime.now(timezone.utc).isoformat(timespec="seconds")})
     with open("sessions.json", "w") as _f:
         json.dump(sessions, _f, indent=2)
-    push("sessions.json", SESSIONS)
-
-    def snapshot(local):
-        # mlflow.db may be mid-write: upload a consistent copy, not the live file
-        if local.suffix != ".db":
-            return local
-        copy = local.with_name("upload.db")
-        with sqlite3.connect(local) as src, sqlite3.connect(copy) as dst:
-            src.backup(dst)
-        return copy
+    push("sessions.json", "sessions.json")
 
     seen = {}
+    lock = threading.Lock()
 
     def sync():
-        for local, name in STATE.items():
-            if local.exists() and seen.get(local) != local.stat().st_mtime:
-                seen[local] = local.stat().st_mtime
-                push(snapshot(local), name)
+        with lock:
+            if RESULTS.exists() and seen.get("mtime") != RESULTS.stat().st_mtime:
+                seen["mtime"] = RESULTS.stat().st_mtime
+                push(RESULTS, "results.json")
 
     proc = subprocess.Popen([sys.executable, "scripts/38_unet_selection.py", "score"], cwd=REPO, text=True,
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
