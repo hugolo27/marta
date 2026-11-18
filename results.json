@@ -1,0 +1,9 @@
+{
+  "hardware": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+  "rf": [],
+  "seed_runs": {
+    "rf_{'n_estimators': 300, 'max_depth': None, 'max_features': 'sqrt'}_seed42": {
+      "score": 0.8105365641862782
+    }
+  }
+}
