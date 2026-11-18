@@ -191,6 +191,9 @@
     },
     "rf_{'n_estimators': 400, 'max_depth': None, 'max_features': 'sqrt'}_seed42": {
       "score": 0.8105417495343289
+    },
+    "rf_{'n_estimators': 400, 'max_depth': None, 'max_features': 'sqrt'}_seed1": {
+      "score": 0.8112198668315486
     }
   }
 }
