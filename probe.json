@@ -1,0 +1,10 @@
+{
+  "device": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+  "torch": "2.11.0+cu130",
+  "cuda": "13.0",
+  "seconds_per_epoch": {
+    "48": 39.00388741493225,
+    "96": 7.044367671012878,
+    "192": 17.186262011528015
+  }
+}
