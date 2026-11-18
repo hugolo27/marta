@@ -82,7 +82,7 @@ def _(Path):
 @app.cell
 def _(STATE_DIR, gh_token, mo, start, subprocess, sys):
     mo.stop(not start.value)
-    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "gdown", "mlflow==3.16.0", "scikit-learn==1.9.0"],
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "gdown==6.5.1", "mlflow==3.16.0", "scikit-learn==1.9.0"],
                    check=True)
     token = gh_token.value.strip()
     remote = f"https://x-access-token:{token}@github.com/hugolo27/marta.git"
@@ -130,7 +130,7 @@ def _(
     commit = git("rev-parse", "HEAD", cwd=REPO)
 
     if not TILES_ZIP.exists():
-        gdown.download(drive_url.value.strip(), str(TILES_ZIP), fuzzy=True, quiet=False)
+        gdown.download(drive_url.value.strip(), str(TILES_ZIP), quiet=False)
     digest = hashlib.sha256()
     with open(TILES_ZIP, "rb") as _f:
         for chunk in iter(lambda: _f.read(1 << 24), b""):
