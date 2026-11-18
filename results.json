@@ -645,6 +645,11 @@
       "score": 0.8299486107153321,
       "best_epoch": 158,
       "stop_epoch": 174
+    },
+    "unet_{'tile_px': 48, 'lr': 0.0001, 'batch_size': 16}_cap300_seed7": {
+      "score": 0.8254798004486791,
+      "best_epoch": 82,
+      "stop_epoch": 98
     }
   },
   "unet": [
