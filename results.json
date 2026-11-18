@@ -1,6 +1,23 @@
 {
   "hardware": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
-  "rf": [],
+  "rf": [
+    {
+      "config": {
+        "n_estimators": 300,
+        "max_depth": null,
+        "max_features": "sqrt"
+      },
+      "scores": [
+        0.8105365641862782,
+        0.8110970928563783,
+        0.8106106805282787,
+        0.8112091456942107,
+        0.8111499421869303
+      ],
+      "mean": 0.8109206850904153,
+      "std": 0.00032036687316152105
+    }
+  ],
   "seed_runs": {
     "rf_{'n_estimators': 300, 'max_depth': None, 'max_features': 'sqrt'}_seed42": {
       "score": 0.8105365641862782
@@ -13,6 +30,9 @@
     },
     "rf_{'n_estimators': 300, 'max_depth': None, 'max_features': 'sqrt'}_seed123": {
       "score": 0.8112091456942107
+    },
+    "rf_{'n_estimators': 300, 'max_depth': None, 'max_features': 'sqrt'}_seed2026": {
+      "score": 0.8111499421869303
     }
   }
 }
