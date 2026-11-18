@@ -192,6 +192,22 @@
       ],
       "mean": 0.8140280444102859,
       "std": 0.0002307477976778025
+    },
+    {
+      "config": {
+        "n_estimators": 500,
+        "max_depth": null,
+        "max_features": "sqrt"
+      },
+      "scores": [
+        0.8107880354489455,
+        0.8113966890667349,
+        0.8110862167378109,
+        0.8115487450971287,
+        0.8117777958014485
+      ],
+      "mean": 0.8113194964304137,
+      "std": 0.00038904439257869396
     }
   ],
   "seed_runs": {
@@ -386,6 +402,9 @@
     },
     "rf_{'n_estimators': 500, 'max_depth': None, 'max_features': 'sqrt'}_seed123": {
       "score": 0.8115487450971287
+    },
+    "rf_{'n_estimators': 500, 'max_depth': None, 'max_features': 'sqrt'}_seed2026": {
+      "score": 0.8117777958014485
     }
   }
 }
