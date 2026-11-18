@@ -245,7 +245,8 @@ def _(
 
     proc = subprocess.Popen([sys.executable, "scripts/38_unet_selection.py", "score"], cwd=REPO, text=True,
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                            env={**os.environ, "MLFLOW_DISABLE_AGENT_HINT": "1"})
+                            # molab's Python does not put the script's own folder on the path, so 38 cannot import its siblings
+                            env={**os.environ, "MLFLOW_DISABLE_AGENT_HINT": "1", "PYTHONPATH": str(REPO / "scripts")})
 
     def watch():
         while proc.poll() is None:
