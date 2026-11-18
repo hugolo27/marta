@@ -4,6 +4,9 @@
   "seed_runs": {
     "rf_{'n_estimators': 300, 'max_depth': None, 'max_features': 'sqrt'}_seed42": {
       "score": 0.8105365641862782
+    },
+    "rf_{'n_estimators': 300, 'max_depth': None, 'max_features': 'sqrt'}_seed1": {
+      "score": 0.8110970928563783
     }
   }
 }
