@@ -118,6 +118,8 @@ def _(
 
     if not STATE_DIR.exists():
         git("clone", "-q", "--branch", STATE_BRANCH, remote, str(STATE_DIR), cwd=None)
+    # A token pasted again in the same session must replace the one saved by the clone
+    git("remote", "set-url", "origin", remote)
     git("pull", "-q")
     sessions_path = STATE_DIR / "sessions.json"
     sessions = json.loads(sessions_path.read_text()) if sessions_path.exists() else []
