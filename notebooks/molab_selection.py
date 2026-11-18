@@ -15,6 +15,8 @@ def _():
     import sys
     import threading
     import time
+    import urllib.error
+    import urllib.request
     import zipfile
     from datetime import datetime, timezone
     from pathlib import Path
@@ -34,6 +36,7 @@ def _():
         threading,
         time,
         timezone,
+        urllib,
         zipfile,
     )
 
@@ -80,12 +83,21 @@ def _(Path):
 
 
 @app.cell
-def _(STATE_DIR, gh_token, mo, start, subprocess, sys):
+def _(STATE_DIR, gh_token, json, mo, start, subprocess, sys, urllib):
     mo.stop(not start.value)
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "gdown==6.5.1", "mlflow==3.16.0", "scikit-learn==1.9.0"],
                    check=True)
     token = gh_token.value.strip()
-    remote = f"https://x-access-token:{token}@github.com/hugolo27/marta.git"
+    # Fail before the 4 GB download, not after the probe
+    _req = urllib.request.Request("https://api.github.com/repos/hugolo27/marta",
+                                  headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"})
+    try:
+        _perms = json.loads(urllib.request.urlopen(_req).read())["permissions"]
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"GitHub rejected the token ({e.code}): copy it again, it starts with github_pat_") from None
+    if not _perms["push"]:
+        raise RuntimeError("the token cannot write to hugolo27/marta: give it Contents read and write")
+    remote = f"https://hugolo27:{token}@github.com/hugolo27/marta.git"
 
     def git(*args, cwd=STATE_DIR):
         r = subprocess.run(["git", "-c", "user.name=hugolo27", "-c", "user.email=hugolo27@users.noreply.github.com",
