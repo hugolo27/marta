@@ -1,8 +1,8 @@
 {
   "n_points": 345,
   "aoi_test_split_reference": {
-    "rf_5seed_mean_macro_f1": 0.8110616249684363,
-    "cnn_5seed_mean_macro_f1": 0.8599495897324996,
+    "rf_5seed_mean_macro_f1": 0.8413127138025353,
+    "cnn_5seed_mean_macro_f1": 0.865077865777377,
     "note": "5-seed means from comparison_results.json (scripts/11_compare_classifiers.py), read live rather than hardcoded so this can't go stale when that file is regenerated."
   },
   "filadelfia_holdout": {
@@ -14,108 +14,108 @@
       2026
     ],
     "rf": {
-      "macro_f1_mean": 0.8306861297380506,
-      "macro_f1_std": 0.0012280395250765103,
+      "macro_f1_mean": 0.8393690890055471,
+      "macro_f1_std": 0.0038776205203083962,
       "macro_f1_runs": [
-        0.831,
-        0.8313,
-        0.8285,
-        0.8313,
-        0.8313
+        0.8419,
+        0.8339,
+        0.8421,
+        0.8423,
+        0.8367
       ],
-      "accuracy_mean": 0.8255072463768116,
-      "accuracy_std": 0.0012962712913042517,
+      "accuracy_mean": 0.8347826086956521,
+      "accuracy_std": 0.004099169746008993,
       "iou_per_class_mean": {
-        "bosque": 0.8124,
-        "pasto": 0.6319,
-        "cultivo": 0.6966
+        "bosque": 0.7965,
+        "pasto": 0.6455,
+        "cultivo": 0.7345
       },
       "iou_per_class_std": {
-        "bosque": 0.0074,
-        "pasto": 0.0046,
-        "cultivo": 0.0029
+        "bosque": 0.0108,
+        "pasto": 0.0069,
+        "cultivo": 0.0064
       }
     },
     "cnn": {
-      "macro_f1_mean": 0.7055623106518537,
-      "macro_f1_std": 0.015738378491286495,
+      "macro_f1_mean": 0.8240476887201522,
+      "macro_f1_std": 0.010187068946776684,
       "macro_f1_runs": [
-        0.7204,
-        0.6949,
-        0.7204,
-        0.6848,
-        0.7072
+        0.8306,
+        0.8183,
+        0.8342,
+        0.8092,
+        0.8279
       ],
-      "accuracy_mean": 0.7118840579710145,
-      "accuracy_std": 0.016851526786954903,
+      "accuracy_mean": 0.8202898550724637,
+      "accuracy_std": 0.01024792436502241,
       "iou_per_class_mean": {
-        "bosque": 0.4513,
-        "pasto": 0.5197,
-        "cultivo": 0.6832
+        "bosque": 0.731,
+        "pasto": 0.6265,
+        "cultivo": 0.7516
       },
       "iou_per_class_std": {
-        "bosque": 0.0265,
-        "pasto": 0.0081,
-        "cultivo": 0.044
+        "bosque": 0.0432,
+        "pasto": 0.0165,
+        "cultivo": 0.0314
       }
     },
-    "pooled_std": 0.011162540898248469,
-    "cnn_minus_rf": -0.12512381908619685,
+    "pooled_std": 0.007707538991983711,
+    "cnn_minus_rf": -0.01532140028539486,
     "winner": "rf",
     "note": "5-seed mean/std (code review 2026-09-12), same protocol as 11_compare_classifiers.py's AOI comparison \u2014 replaces the earlier single seed=42-only numbers, which had no variance estimate."
   },
   "worldcover_cross_check": {
     "rf": {
       "agreement_rate": {
-        "bosque": 0.978021978021978,
-        "pasto": 0.525974025974026,
-        "cultivo": 0.62
+        "bosque": 0.9777777777777777,
+        "pasto": 0.5466666666666666,
+        "cultivo": 0.6571428571428571
       },
       "confusion": {
         "bosque": {
           "other": 1,
-          "bosque": 89,
+          "bosque": 88,
           "pasto (proxy debil)": 0,
           "cultivo": 1
         },
         "pasto": {
-          "other": 8,
-          "bosque": 38,
-          "pasto (proxy debil)": 81,
-          "cultivo": 27
+          "other": 6,
+          "bosque": 42,
+          "pasto (proxy debil)": 82,
+          "cultivo": 20
         },
         "cultivo": {
-          "other": 0,
-          "bosque": 5,
-          "pasto (proxy debil)": 33,
-          "cultivo": 62
+          "other": 2,
+          "bosque": 2,
+          "pasto (proxy debil)": 32,
+          "cultivo": 69
         }
       }
     },
     "cnn": {
       "agreement_rate": {
-        "bosque": 1.0,
-        "pasto": 0.4523809523809524,
-        "cultivo": 0.5873015873015873
+        "bosque": 0.9761904761904762,
+        "pasto": 0.5283018867924528,
+        "cultivo": 0.6764705882352942
       },
       "confusion": {
         "bosque": {
-          "other": 0,
-          "bosque": 51,
+          "other": 1,
+          "bosque": 82,
           "pasto (proxy debil)": 0,
-          "cultivo": 0
+          "cultivo": 1
         },
         "pasto": {
-          "other": 6,
-          "bosque": 70,
-          "pasto (proxy debil)": 76,
-          "cultivo": 16
+          "other": 7,
+          "bosque": 48,
+          "pasto (proxy debil)": 84,
+          "cultivo": 20
         },
         "cultivo": {
-          "other": 3,
-          "bosque": 11,
-          "pasto (proxy debil)": 38,
-          "cultivo": 74
+          "other": 1,
+          "bosque": 2,
+          "pasto (proxy debil)": 30,
+          "cultivo": 69
         }
       }
     },

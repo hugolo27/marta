@@ -17,12 +17,13 @@ from torch.utils.data import DataLoader
 import classifier_report
 import dataset_loader as dl
 
-BATCH_SIZE = 16
-LEARNING_RATE = 0.0003
+BATCH_SIZE = 32
+LEARNING_RATE = 0.0001
 MAX_EPOCHS = 100
 EARLY_STOP_PATIENCE = 10
-DROPOUT = 0.5
-PATCH_PX = 33
+DROPOUT = 0.3
+PATCH_PX = 3
+SEASON = "drywet"
 OUT_DIR = Path(__file__).resolve().parents[1] / "data" / "study_area"
 CHECKPOINT_PATH = OUT_DIR / "cnn_checkpoint.pt"
 EXPERIMENT_NAME = "phase1-classifier"
@@ -30,11 +31,18 @@ EXPERIMENT_NAME = "phase1-classifier"
 
 class SmallCNN(nn.Module):
     """patch_px=3 crops the central 3x3 block (one MapBiomas pixel) out of whatever patch it gets,
-    so the 33x33 data paths stay as they are; a 3x3 map can't be pooled twice (phase1-patch-size D1)."""
+    so the 33x33 data paths stay as they are; a 3x3 map can't be pooled twice (phase1-patch-size D1).
+    The input is normalized per channel inside the model (train-split mean and std, set by train()
+    and saved with the weights), so every caller feeds raw patches and gets the same scaling
+    (phase1-dataset-v2). Bands are in the thousands and NDVI below 1, so unscaled, NDVI barely
+    reaches the first layer."""
 
-    def __init__(self, in_channels=13, n_classes=3, dropout=DROPOUT, patch_px=PATCH_PX):
+    def __init__(self, n_classes=3, dropout=DROPOUT, patch_px=PATCH_PX, season=SEASON):
         super().__init__()
-        self.patch_px = patch_px
+        self.patch_px, self.season = patch_px, season
+        in_channels = dl.SEASON_CHANNELS[season].stop
+        self.register_buffer("mean", torch.zeros(in_channels))
+        self.register_buffer("std", torch.ones(in_channels))
         pool = nn.MaxPool2d(2) if patch_px > 3 else nn.Identity()
         self.features = nn.Sequential(
             nn.Conv2d(in_channels, 32, 3, padding=1), nn.BatchNorm2d(32), nn.ReLU(), pool,
@@ -46,7 +54,9 @@ class SmallCNN(nn.Module):
 
     def forward(self, x):
         start = (x.shape[-1] - self.patch_px) // 2
-        x = x[..., start:start + self.patch_px, start:start + self.patch_px]
+        # A dry model fed a dry+wet patch keeps the dry channels, so callers can always pull both.
+        x = x[:, :len(self.mean), start:start + self.patch_px, start:start + self.patch_px]
+        x = (x - self.mean[:, None, None]) / self.std[:, None, None]
         x = self.features(x)
         x = self.pool(x).flatten(1)
         return self.classifier(x)
@@ -79,14 +89,18 @@ def seed_everything(seed):
 
 
 def train(seed=42, verbose=True, batch_size=BATCH_SIZE, lr=LEARNING_RATE, dropout=DROPOUT, max_epochs=MAX_EPOCHS,
-          patch_px=PATCH_PX):
+          patch_px=PATCH_PX, season=SEASON):
     seed_everything(seed)
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    train_loader = DataLoader(dl.PatchDataset("train", augment=True), batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(dl.PatchDataset("val", augment=False), batch_size=batch_size)
+    train_loader = DataLoader(dl.PatchDataset("train", augment=True, season=season), batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(dl.PatchDataset("val", augment=False, season=season), batch_size=batch_size)
 
-    model = SmallCNN(dropout=dropout, patch_px=patch_px).to(device)
+    model = SmallCNN(dropout=dropout, patch_px=patch_px, season=season)
+    mean, std = dl.channel_stats(season)
+    model.mean.copy_(torch.from_numpy(mean))
+    model.std.copy_(torch.from_numpy(std))
+    model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     history = {"train_loss": [], "val_loss": [], "train_acc": [], "val_acc": []}
@@ -120,7 +134,7 @@ def epochs(history):
 
 
 def evaluate(model, device, split="test"):
-    loader = DataLoader(dl.PatchDataset(split, augment=False), batch_size=BATCH_SIZE)
+    loader = DataLoader(dl.PatchDataset(split, augment=False, season=model.season), batch_size=BATCH_SIZE)
     model.eval()
     all_preds, all_labels = [], []
     with torch.no_grad():
@@ -136,14 +150,15 @@ def save_checkpoint(model, seed, path=CHECKPOINT_PATH):
     """Persists trained weights so a downstream script (phase1-temporal-comparison) can apply
     the exact same decision boundary to more than one date, instead of retraining per use --
     every prior phase1-classifier script trained transiently since none needed that (design.md)."""
-    torch.save({"state_dict": model.state_dict(), "seed": seed, "patch_px": model.patch_px}, path)
+    torch.save({"state_dict": model.state_dict(), "seed": seed, "patch_px": model.patch_px, "season": model.season}, path)
 
 
 def load_checkpoint(path=CHECKPOINT_PATH, device=None):
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
     checkpoint = torch.load(path, map_location=device)
-    model = SmallCNN(patch_px=checkpoint.get("patch_px", 33)).to(device)
-    model.load_state_dict(checkpoint["state_dict"])
+    model = SmallCNN(patch_px=checkpoint.get("patch_px", 33), season=checkpoint.get("season", "dry")).to(device)
+    # checkpoints from before phase1-dataset-v2 have no mean/std: they keep the identity defaults
+    model.load_state_dict({**model.state_dict(), **checkpoint["state_dict"]})
     model.eval()
     return model, device
 
@@ -178,7 +193,7 @@ def main():
 
         best_epoch, stop_epoch = epochs(history)
         mlflow.log_params({
-            "seed": 42, "batch_size": BATCH_SIZE, "lr": LEARNING_RATE, "dropout": DROPOUT, "patch_px": PATCH_PX,
+            "seed": 42, "batch_size": BATCH_SIZE, "lr": LEARNING_RATE, "dropout": DROPOUT, "patch_px": PATCH_PX, "season": SEASON,
             "best_epoch": best_epoch, "stop_epoch": stop_epoch,
         })
         mlflow.log_metric("macro_f1", results["report"]["macro avg"]["f1-score"])

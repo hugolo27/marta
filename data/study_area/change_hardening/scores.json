@@ -19,33 +19,33 @@
         "mmu": false
       },
       "aoi": {
-        "map_loss_ha": 899.4,
+        "map_loss_ha": 409.6,
         "confirmed_loss_ha": 0.0,
         "retention": null,
-        "false_loss_ha": 899.4,
-        "stable_forest_kept": 0.9563,
+        "false_loss_ha": 409.6,
+        "stable_forest_kept": 0.9801,
         "vs_hansen": {
           "map_loss_confirmed": 0.0,
           "hansen_loss_captured": null
         },
         "vs_mapbiomas": {
-          "map_loss_confirmed": 0.0,
-          "mapbiomas_loss_captured": 0.0
+          "map_loss_confirmed": 0.0015,
+          "mapbiomas_loss_captured": 0.0972
         }
       },
       "dev": {
-        "map_loss_ha": 6597.4,
+        "map_loss_ha": 5293.1,
         "confirmed_loss_ha": 4855.9,
-        "retention": 0.9845,
-        "false_loss_ha": 1816.6,
-        "stable_forest_kept": 0.9031,
+        "retention": 0.9611,
+        "false_loss_ha": 626.2,
+        "stable_forest_kept": 0.9942,
         "vs_hansen": {
-          "map_loss_confirmed": 0.816,
-          "hansen_loss_captured": 0.9757
+          "map_loss_confirmed": 0.9225,
+          "hansen_loss_captured": 0.8849
         },
         "vs_mapbiomas": {
-          "map_loss_confirmed": 0.7622,
-          "mapbiomas_loss_captured": 0.9056
+          "map_loss_confirmed": 0.9368,
+          "mapbiomas_loss_captured": 0.8931
         }
       }
     },
@@ -56,33 +56,33 @@
         "mmu": true
       },
       "aoi": {
-        "map_loss_ha": 893.5,
+        "map_loss_ha": 364.5,
         "confirmed_loss_ha": 0.0,
         "retention": null,
-        "false_loss_ha": 893.5,
-        "stable_forest_kept": 0.9565,
+        "false_loss_ha": 364.5,
+        "stable_forest_kept": 0.9822,
         "vs_hansen": {
           "map_loss_confirmed": 0.0,
           "hansen_loss_captured": null
         },
         "vs_mapbiomas": {
-          "map_loss_confirmed": 0.0,
-          "mapbiomas_loss_captured": 0.0
+          "map_loss_confirmed": 0.0017,
+          "mapbiomas_loss_captured": 0.0972
         }
       },
       "dev": {
-        "map_loss_ha": 6591.1,
+        "map_loss_ha": 5264.4,
         "confirmed_loss_ha": 4855.9,
-        "retention": 0.9845,
-        "false_loss_ha": 1810.3,
-        "stable_forest_kept": 0.9036,
+        "retention": 0.9604,
+        "false_loss_ha": 600.9,
+        "stable_forest_kept": 0.9946,
         "vs_hansen": {
-          "map_loss_confirmed": 0.8168,
-          "hansen_loss_captured": 0.9756
+          "map_loss_confirmed": 0.9265,
+          "hansen_loss_captured": 0.884
         },
         "vs_mapbiomas": {
-          "map_loss_confirmed": 0.7627,
-          "mapbiomas_loss_captured": 0.9054
+          "map_loss_confirmed": 0.9396,
+          "mapbiomas_loss_captured": 0.8909
         }
       }
     },
@@ -93,33 +93,33 @@
         "mmu": false
       },
       "aoi": {
-        "map_loss_ha": 429.1,
+        "map_loss_ha": 291.2,
         "confirmed_loss_ha": 0.0,
         "retention": null,
-        "false_loss_ha": 429.1,
-        "stable_forest_kept": 0.9794,
+        "false_loss_ha": 291.2,
+        "stable_forest_kept": 0.9858,
         "vs_hansen": {
           "map_loss_confirmed": 0.0,
           "hansen_loss_captured": null
         },
         "vs_mapbiomas": {
-          "map_loss_confirmed": 0.0,
-          "mapbiomas_loss_captured": 0.0
+          "map_loss_confirmed": 0.0006,
+          "mapbiomas_loss_captured": 0.0278
         }
       },
       "dev": {
-        "map_loss_ha": 5845.9,
+        "map_loss_ha": 5101.5,
         "confirmed_loss_ha": 4855.9,
-        "retention": 0.9355,
-        "false_loss_ha": 1303.3,
-        "stable_forest_kept": 0.9367,
+        "retention": 0.9349,
+        "false_loss_ha": 561.7,
+        "stable_forest_kept": 0.996,
         "vs_hansen": {
-          "map_loss_confirmed": 0.8582,
-          "hansen_loss_captured": 0.9092
+          "map_loss_confirmed": 0.9253,
+          "hansen_loss_captured": 0.8555
         },
         "vs_mapbiomas": {
-          "map_loss_confirmed": 0.8119,
-          "mapbiomas_loss_captured": 0.8548
+          "map_loss_confirmed": 0.9452,
+          "mapbiomas_loss_captured": 0.8684
         }
       }
     },
@@ -130,11 +130,11 @@
         "mmu": true
       },
       "aoi": {
-        "map_loss_ha": 424.5,
+        "map_loss_ha": 261.4,
         "confirmed_loss_ha": 0.0,
         "retention": null,
-        "false_loss_ha": 424.5,
-        "stable_forest_kept": 0.9796,
+        "false_loss_ha": 261.4,
+        "stable_forest_kept": 0.9872,
         "vs_hansen": {
           "map_loss_confirmed": 0.0,
           "hansen_loss_captured": null
@@ -145,18 +145,18 @@
         }
       },
       "dev": {
-        "map_loss_ha": 5835.5,
+        "map_loss_ha": 5071.7,
         "confirmed_loss_ha": 4855.9,
-        "retention": 0.9352,
-        "false_loss_ha": 1294.2,
-        "stable_forest_kept": 0.9372,
+        "retention": 0.9339,
+        "false_loss_ha": 536.6,
+        "stable_forest_kept": 0.9964,
         "vs_hansen": {
-          "map_loss_confirmed": 0.8594,
-          "hansen_loss_captured": 0.9089
+          "map_loss_confirmed": 0.9295,
+          "hansen_loss_captured": 0.8543
         },
         "vs_mapbiomas": {
-          "map_loss_confirmed": 0.813,
-          "mapbiomas_loss_captured": 0.8544
+          "map_loss_confirmed": 0.9481,
+          "mapbiomas_loss_captured": 0.866
         }
       }
     },
@@ -167,33 +167,33 @@
         "mmu": false
       },
       "aoi": {
-        "map_loss_ha": 301.7,
+        "map_loss_ha": 154.8,
         "confirmed_loss_ha": 0.0,
         "retention": null,
-        "false_loss_ha": 301.7,
-        "stable_forest_kept": 0.9852,
+        "false_loss_ha": 154.8,
+        "stable_forest_kept": 0.9924,
         "vs_hansen": {
           "map_loss_confirmed": 0.0,
           "hansen_loss_captured": null
         },
         "vs_mapbiomas": {
-          "map_loss_confirmed": 0.0,
-          "mapbiomas_loss_captured": 0.0
+          "map_loss_confirmed": 0.0023,
+          "mapbiomas_loss_captured": 0.0556
         }
       },
       "dev": {
-        "map_loss_ha": 6145.0,
+        "map_loss_ha": 4981.5,
         "confirmed_loss_ha": 4855.9,
-        "retention": 0.9747,
-        "false_loss_ha": 1411.9,
-        "stable_forest_kept": 0.9251,
+        "retention": 0.942,
+        "false_loss_ha": 407.2,
+        "stable_forest_kept": 0.9969,
         "vs_hansen": {
-          "map_loss_confirmed": 0.8631,
-          "hansen_loss_captured": 0.9611
+          "map_loss_confirmed": 0.954,
+          "hansen_loss_captured": 0.8613
         },
         "vs_mapbiomas": {
-          "map_loss_confirmed": 0.7907,
-          "mapbiomas_loss_captured": 0.8751
+          "map_loss_confirmed": 0.9546,
+          "mapbiomas_loss_captured": 0.8564
         }
       }
     },
@@ -204,33 +204,33 @@
         "mmu": true
       },
       "aoi": {
-        "map_loss_ha": 300.0,
+        "map_loss_ha": 139.2,
         "confirmed_loss_ha": 0.0,
         "retention": null,
-        "false_loss_ha": 300.0,
-        "stable_forest_kept": 0.9853,
+        "false_loss_ha": 139.2,
+        "stable_forest_kept": 0.9931,
         "vs_hansen": {
           "map_loss_confirmed": 0.0,
           "hansen_loss_captured": null
         },
         "vs_mapbiomas": {
-          "map_loss_confirmed": 0.0,
-          "mapbiomas_loss_captured": 0.0
+          "map_loss_confirmed": 0.0026,
+          "mapbiomas_loss_captured": 0.0556
         }
       },
       "dev": {
-        "map_loss_ha": 6143.5,
+        "map_loss_ha": 4958.4,
         "confirmed_loss_ha": 4855.9,
-        "retention": 0.9747,
-        "false_loss_ha": 1410.4,
-        "stable_forest_kept": 0.9252,
+        "retention": 0.9412,
+        "false_loss_ha": 387.7,
+        "stable_forest_kept": 0.9971,
         "vs_hansen": {
-          "map_loss_confirmed": 0.8633,
-          "hansen_loss_captured": 0.9611
+          "map_loss_confirmed": 0.9575,
+          "hansen_loss_captured": 0.8604
         },
         "vs_mapbiomas": {
-          "map_loss_confirmed": 0.7908,
-          "mapbiomas_loss_captured": 0.8749
+          "map_loss_confirmed": 0.9557,
+          "mapbiomas_loss_captured": 0.8534
         }
       }
     },
@@ -241,33 +241,33 @@
         "mmu": false
       },
       "aoi": {
-        "map_loss_ha": 145.1,
+        "map_loss_ha": 130.6,
         "confirmed_loss_ha": 0.0,
         "retention": null,
-        "false_loss_ha": 145.1,
-        "stable_forest_kept": 0.9929,
+        "false_loss_ha": 130.6,
+        "stable_forest_kept": 0.9935,
         "vs_hansen": {
           "map_loss_confirmed": 0.0,
           "hansen_loss_captured": null
         },
         "vs_mapbiomas": {
-          "map_loss_confirmed": 0.0,
-          "mapbiomas_loss_captured": 0.0
+          "map_loss_confirmed": 0.0014,
+          "mapbiomas_loss_captured": 0.0278
         }
       },
       "dev": {
-        "map_loss_ha": 5604.6,
+        "map_loss_ha": 4836.4,
         "confirmed_loss_ha": 4855.9,
-        "retention": 0.9311,
-        "false_loss_ha": 1083.2,
-        "stable_forest_kept": 0.9462,
+        "retention": 0.9196,
+        "false_loss_ha": 370.7,
+        "stable_forest_kept": 0.9978,
         "vs_hansen": {
-          "map_loss_confirmed": 0.8882,
-          "hansen_loss_captured": 0.9022
+          "map_loss_confirmed": 0.9559,
+          "hansen_loss_captured": 0.8378
         },
         "vs_mapbiomas": {
-          "map_loss_confirmed": 0.8267,
-          "mapbiomas_loss_captured": 0.8345
+          "map_loss_confirmed": 0.9596,
+          "mapbiomas_loss_captured": 0.8359
         }
       }
     },
@@ -278,11 +278,11 @@
         "mmu": true
       },
       "aoi": {
-        "map_loss_ha": 144.4,
+        "map_loss_ha": 116.1,
         "confirmed_loss_ha": 0.0,
         "retention": null,
-        "false_loss_ha": 144.4,
-        "stable_forest_kept": 0.993,
+        "false_loss_ha": 116.1,
+        "stable_forest_kept": 0.9942,
         "vs_hansen": {
           "map_loss_confirmed": 0.0,
           "hansen_loss_captured": null
@@ -293,18 +293,18 @@
         }
       },
       "dev": {
-        "map_loss_ha": 5601.1,
+        "map_loss_ha": 4810.7,
         "confirmed_loss_ha": 4855.9,
-        "retention": 0.9308,
-        "false_loss_ha": 1081.1,
-        "stable_forest_kept": 0.9463,
+        "retention": 0.9183,
+        "false_loss_ha": 351.4,
+        "stable_forest_kept": 0.998,
         "vs_hansen": {
-          "map_loss_confirmed": 0.8885,
-          "hansen_loss_captured": 0.9019
+          "map_loss_confirmed": 0.9594,
+          "hansen_loss_captured": 0.8364
         },
         "vs_mapbiomas": {
-          "map_loss_confirmed": 0.8269,
-          "mapbiomas_loss_captured": 0.8342
+          "map_loss_confirmed": 0.9607,
+          "mapbiomas_loss_captured": 0.8323
         }
       }
     },
@@ -315,33 +315,33 @@
         "mmu": false
       },
       "aoi": {
-        "map_loss_ha": 18.8,
+        "map_loss_ha": 13.3,
         "confirmed_loss_ha": 0.0,
         "retention": null,
-        "false_loss_ha": 18.8,
-        "stable_forest_kept": 0.9991,
+        "false_loss_ha": 13.3,
+        "stable_forest_kept": 0.9993,
         "vs_hansen": {
           "map_loss_confirmed": 0.0,
           "hansen_loss_captured": null
         },
         "vs_mapbiomas": {
-          "map_loss_confirmed": 0.0,
-          "mapbiomas_loss_captured": 0.0
+          "map_loss_confirmed": 0.0068,
+          "mapbiomas_loss_captured": 0.0139
         }
       },
       "dev": {
-        "map_loss_ha": 5274.1,
+        "map_loss_ha": 4422.0,
         "confirmed_loss_ha": 4855.9,
-        "retention": 0.9112,
-        "false_loss_ha": 849.1,
-        "stable_forest_kept": 0.9563,
+        "retention": 0.8738,
+        "false_loss_ha": 178.7,
+        "stable_forest_kept": 0.9993,
         "vs_hansen": {
-          "map_loss_confirmed": 0.9118,
-          "hansen_loss_captured": 0.8715
+          "map_loss_confirmed": 0.986,
+          "hansen_loss_captured": 0.7902
         },
         "vs_mapbiomas": {
-          "map_loss_confirmed": 0.8481,
-          "mapbiomas_loss_captured": 0.8056
+          "map_loss_confirmed": 0.9716,
+          "mapbiomas_loss_captured": 0.7738
         }
       }
     },
@@ -352,47 +352,10 @@
         "mmu": true
       },
       "aoi": {
-        "map_loss_ha": 18.3,
+        "map_loss_ha": 8.9,
         "confirmed_loss_ha": 0.0,
         "retention": null,
-        "false_loss_ha": 18.3,
-        "stable_forest_kept": 0.9991,
-        "vs_hansen": {
-          "map_loss_confirmed": 0.0,
-          "hansen_loss_captured": null
-        },
-        "vs_mapbiomas": {
-          "map_loss_confirmed": 0.0,
-          "mapbiomas_loss_captured": 0.0
-        }
-      },
-      "dev": {
-        "map_loss_ha": 5270.8,
-        "confirmed_loss_ha": 4855.9,
-        "retention": 0.9109,
-        "false_loss_ha": 847.4,
-        "stable_forest_kept": 0.9563,
-        "vs_hansen": {
-          "map_loss_confirmed": 0.9119,
-          "hansen_loss_captured": 0.8711
-        },
-        "vs_mapbiomas": {
-          "map_loss_confirmed": 0.8483,
-          "mapbiomas_loss_captured": 0.8053
-        }
-      }
-    },
-    {
-      "config": {
-        "confidence": 0.9,
-        "persistence": true,
-        "mmu": false
-      },
-      "aoi": {
-        "map_loss_ha": 7.1,
-        "confirmed_loss_ha": 0.0,
-        "retention": null,
-        "false_loss_ha": 7.1,
+        "false_loss_ha": 8.9,
         "stable_forest_kept": 0.9996,
         "vs_hansen": {
           "map_loss_confirmed": 0.0,
@@ -404,18 +367,55 @@
         }
       },
       "dev": {
-        "map_loss_ha": 4969.9,
+        "map_loss_ha": 4406.8,
         "confirmed_loss_ha": 4855.9,
-        "retention": 0.8825,
-        "false_loss_ha": 684.4,
-        "stable_forest_kept": 0.9667,
+        "retention": 0.8725,
+        "false_loss_ha": 169.9,
+        "stable_forest_kept": 0.9993,
         "vs_hansen": {
-          "map_loss_confirmed": 0.9279,
-          "hansen_loss_captured": 0.8357
+          "map_loss_confirmed": 0.9879,
+          "hansen_loss_captured": 0.7889
         },
         "vs_mapbiomas": {
-          "map_loss_confirmed": 0.8706,
-          "mapbiomas_loss_captured": 0.7792
+          "map_loss_confirmed": 0.9718,
+          "mapbiomas_loss_captured": 0.7713
+        }
+      }
+    },
+    {
+      "config": {
+        "confidence": 0.9,
+        "persistence": true,
+        "mmu": false
+      },
+      "aoi": {
+        "map_loss_ha": 12.5,
+        "confirmed_loss_ha": 0.0,
+        "retention": null,
+        "false_loss_ha": 12.5,
+        "stable_forest_kept": 0.9994,
+        "vs_hansen": {
+          "map_loss_confirmed": 0.0,
+          "hansen_loss_captured": null
+        },
+        "vs_mapbiomas": {
+          "map_loss_confirmed": 0.0072,
+          "mapbiomas_loss_captured": 0.0139
+        }
+      },
+      "dev": {
+        "map_loss_ha": 4337.7,
+        "confirmed_loss_ha": 4855.9,
+        "retention": 0.8585,
+        "false_loss_ha": 168.8,
+        "stable_forest_kept": 0.9995,
+        "vs_hansen": {
+          "map_loss_confirmed": 0.9866,
+          "hansen_loss_captured": 0.7756
+        },
+        "vs_mapbiomas": {
+          "map_loss_confirmed": 0.973,
+          "mapbiomas_loss_captured": 0.7601
         }
       }
     },
@@ -426,11 +426,11 @@
         "mmu": true
       },
       "aoi": {
-        "map_loss_ha": 6.7,
+        "map_loss_ha": 8.0,
         "confirmed_loss_ha": 0.0,
         "retention": null,
-        "false_loss_ha": 6.7,
-        "stable_forest_kept": 0.9997,
+        "false_loss_ha": 8.0,
+        "stable_forest_kept": 0.9996,
         "vs_hansen": {
           "map_loss_confirmed": 0.0,
           "hansen_loss_captured": null
@@ -441,18 +441,18 @@
         }
       },
       "dev": {
-        "map_loss_ha": 4962.9,
+        "map_loss_ha": 4320.5,
         "confirmed_loss_ha": 4855.9,
-        "retention": 0.882,
-        "false_loss_ha": 679.9,
-        "stable_forest_kept": 0.9669,
+        "retention": 0.8569,
+        "false_loss_ha": 159.5,
+        "stable_forest_kept": 0.9995,
         "vs_hansen": {
-          "map_loss_confirmed": 0.9283,
-          "hansen_loss_captured": 0.8349
+          "map_loss_confirmed": 0.9886,
+          "hansen_loss_captured": 0.7741
         },
         "vs_mapbiomas": {
-          "map_loss_confirmed": 0.8712,
-          "mapbiomas_loss_captured": 0.7787
+          "map_loss_confirmed": 0.9732,
+          "mapbiomas_loss_captured": 0.7573
         }
       }
     }
@@ -460,6 +460,6 @@
   "selected": {
     "confidence": 0.9,
     "persistence": true,
-    "mmu": false
+    "mmu": true
   }
 }
