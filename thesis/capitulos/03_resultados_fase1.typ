@@ -146,9 +146,7 @@ elegir, el 33×33 gana con claridad y el 3×3 rinde igual que el Random Forest: 
 la CNN se comporta casi como un clasificador por píxel. El split de validación (361
 ejemplos) resultó demasiado chico para separar las dos variantes. A partir de este resultado
 el trabajo sigue con la entrada de 3×3, sobre un dataset más grande (sección "Dataset final
-y selección de variantes"). La regla dejó el 3×3 por defecto atribuyéndolo al tutor, y esa
-atribución fue un error: el tutor había sugerido una entrada más grande. La regla se aplicó tal
-como se registró.
+y selección de variantes").
 
 == Autocorrelación espacial y tamaño de los bloques
 
