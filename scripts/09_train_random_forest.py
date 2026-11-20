@@ -4,6 +4,7 @@ window the CNN uses, see design.md."""
 
 from collections import Counter
 
+import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 
 import classifier_report
@@ -43,3 +44,25 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+def train_tiles(rows, seed=42, n_estimators=N_ESTIMATORS, max_depth=MAX_DEPTH, max_features=MAX_FEATURES,
+                max_samples=None, tile_px=192):
+    """Random Forest at 30 m for phase1-segmentation D3: one example per labeled 30 m cell, the mean
+    of its 3x3 block. max_samples is the bootstrap size of each tree, set by the pilot's curve (D4)."""
+    X, y = dl.block_features(rows, tile_px)
+    rf = RandomForestClassifier(n_estimators=n_estimators, max_depth=max_depth, max_features=max_features,
+                                max_samples=max_samples, random_state=seed, n_jobs=-1)
+    rf.fit(X, y)
+    return rf
+
+
+def predict_counts_tiles(rf, rows, tile_px=192):
+    """classifier_report.dice_counts per tile, (N, 3, 3), scored on the same 30 m cells as the U-Net."""
+    counts = []
+    for row in rows:
+        image, label = dl.load_tile(row["path"], tile_px)
+        cells = dl.tile_to_float(image).reshape(tile_px // 3, 3, tile_px // 3, 3, 26).mean(axis=(1, 3))
+        pred = rf.predict(cells.reshape(-1, 26)).reshape(label.shape)
+        counts.append(classifier_report.dice_counts(pred, label))
+    return np.stack(counts)

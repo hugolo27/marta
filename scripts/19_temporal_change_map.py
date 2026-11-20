@@ -55,7 +55,7 @@ FOREST_CLASS = CLASS_NAMES.index("bosque")
 STABLE_FOREST, STABLE_NONFOREST, LOSS, GAIN = 0, 1, 2, 3
 FNF_NAMES = {STABLE_FOREST: "stable_forest", STABLE_NONFOREST: "stable_nonforest", LOSS: "loss", GAIN: "gain"}
 FNF_PALETTE = {UNCLASSIFIED: "#9ca3af", STABLE_FOREST: "#1f8d49", STABLE_NONFOREST: "#e5e5e5", LOSS: "#d0342c", GAIN: "#2563eb"}
-MMU_PX = 50  # 0.5 ha at 10 m, the Paraguayan forest definition's minimum area
+MMU_PX = 6  # 0.5 ha, the Paraguayan forest definition's minimum area, in 30 m cells (5.6, rounded up; unet_change/README.md)
 PERSISTENCE_YEAR = "2022"
 
 VISUAL_CHECK_N = 2

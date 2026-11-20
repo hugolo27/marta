@@ -89,6 +89,127 @@ seca) se mantiene salvo que otra la supere por más de la desviación estándar 
 test se evalúa una sola vez, con lo ya elegido; el detalle está en los resultados de
 Fase 1. En todo el trabajo, la dispersión entre semillas se reporta como desvío muestral.
 
+== Segmentación con U-Net (en curso)
+
+Con la entrada de 3×3, la CNN tenía 100.707 pesos para 234 números de entrada, un modelo
+demasiado grande para lo que ve. Por indicación del tutor, el clasificador con contexto pasa a
+ser una U-Net @ronneberger2015unet que segmenta: recibe un recorte de imagen y devuelve una
+clase por píxel, y se evalúa con el coeficiente Dice @dice1945measures: dos veces las celdas
+en que coinciden su mapa y el de referencia, dividido por la suma de las celdas de esa clase en
+cada uno. El objetivo de comparar un clasificador
+con contexto espacial contra uno por píxel no cambia: el Random Forest sigue como referencia.
+
+*Recortes.* Cada ejemplo es un recorte de 192×192 píxeles de Sentinel-2 (1,92 km de lado) con
+los 26 canales, más el mapa de MapBiomas del mismo terreno (64×64 a 30 m). La imagen queda en
+su grilla UTM original, con bordes en múltiplos de 30 m; las etiquetas se llevan a esa grilla
+tomando el píxel de MapBiomas bajo el centro de cada celda de 30 m. Hacerlo al revés deformaría
+todas las reflectancias. Se verificó en 5 recortes: 20 de 20 píxeles de imagen y 30 de 30
+etiquetas coinciden con las fuentes, y los bordes de MapBiomas caen sobre los bordes visibles de
+lotes y cortinas de bosque. Los recortes de 96 y 48 píxeles salen del centro del de 192. Se
+extrajeron 1.940 recortes (2019 y 2023, centrados por igual en las tres clases), con el recorte
+entero fuera de las regiones reservadas.
+
+*Medición a 30 m.* La U-Net predice a 10 m, pero sus probabilidades se promedian en cada bloque
+de 3×3 y tanto el entrenamiento como la evaluación se hacen a 30 m, la resolución real de la
+etiqueta. Los píxeles de clases fuera de las tres (agua, pastizal natural, urbano) no cuentan
+ni al entrenar ni al medir, como los píxeles _void_ de Cityscapes @cordts2016cityscapes. Al
+clasificar el AOI no se enmascaran: el modelo responde bosque, pasto o cultivo en todas partes,
+y eso queda declarado como limitación (son el 0,6 % de las celdas de entrenamiento). El
+Random Forest clasifica cada celda de 30 m con el promedio de su bloque de 3×3 y se mide sobre
+las mismas celdas.
+
+*De dónde sale cada valor.* Ninguno se elige a ojo: cada uno tiene una fuente, una medición o
+una razón geométrica.
+
+#table(
+  columns: (auto, auto, 1fr),
+  align: (left, left, left),
+  table.header([*Valor*], [*Elección*], [*Base*]),
+  [Tamaño del recorte], [48, 96 o 192 px, elegido en validación], [Múltiplo de 3 (grilla de MapBiomas) y de 16 (cuatro reducciones); trabajos con Sentinel-2 usan hasta 512 px @john2022attention],
+  [Niveles, filtros, bloques], [reducir hasta que el mapa quede en 4 px; 32 filtros que se duplican], [nnU-Net @isensee2021nnunet],
+  [Pérdida], [entropía cruzada + Dice], [@isensee2021nnunet @milletari2016vnet],
+  [Optimizador y `lr`], [Adam; 0,0001 a 0,001], [@kingma2014adam @john2022attention],
+  [Dropout], [ninguno], [@isensee2021nnunet @john2022attention],
+  [Aumento de datos], [giros de 90° y espejos], [@isensee2021nnunet],
+  [Paciencia, tamaños de validación y test, cantidad de recortes], [medidos en un estudio piloto], [@prechelt1998early @xu2018splitting @ning2020training],
+  [Regla de borde], [si gana un extremo de la grilla, se prueba un paso más (×3 en `lr`, ×2 en lote)], [@godbole2023tuning; el tamaño del paso es convención],
+  [Semillas y regla], [5 semillas; gana si supera por más que el desvío combinado], [@henderson2018deep; equivale a una _d_ de Cohen mayor que 1 @cohen2013statistical],
+  [Explicaciones], [Grad-CAM para segmentación], [@vinogradova2020segcam],
+)
+
+*Estudio piloto.* Antes de elegir nada, un piloto con reglas registradas de antemano mide lo
+que la literatura no fija. Primero se aparta el 20 % de los bloques de 6 km como reserva para
+test, que el piloto no lee. Con el resto se entrenan seis U-Net de prueba sin corte temprano y
+se mide: cuántas épocas sin mejora conviene esperar antes de cortar; cuántos bloques necesitan
+validación y test para que su nota varíe menos que el ruido entre semillas (por _bootstrap_
+sobre bloques, porque los píxeles de un mismo bloque se parecen); si 1.940 recortes alcanzan
+(curva de aprendizaje); y cuántas celdas necesita cada árbol del Random Forest. Los modelos del
+piloto se descartan. La regla de proporciones fija (como 70/15/15) no tiene respaldo en la
+literatura para este caso @xu2018splitting @joseph2022optimal; por eso se mide.
+
+*Resultado del piloto.* Cada corrida de 100 épocas a 96 px tardó 18 minutos en el M4. El
+ruido entre semillas fue 0,0039 de Dice macro. Tres corridas alcanzaron su mejor época en las
+últimas diez, así que el tope sube a 300 épocas; la paciencia medida es 20. Validación necesita
+390 bloques. Test necesitaría más de 400 y la reserva tiene 196: se usan todos y se reporta su
+precisión (0,0099). La curva de aprendizaje (0,792, 0,803, 0,815 y 0,825 con el 25, 50, 75 y
+100 % de los recortes) sigue subiendo, unos 0,016 por cada vez que se duplican los datos, sin
+meseta visible al ajustar una ley de potencia inversa @figueroa2012predicting. Por la regla
+registrada, se descargan más recortes antes de la selección. La regla del piloto pedía
+que cada clase tuviera al menos el 10 % de sus recortes en validación y en test; ese umbral no
+tiene fuente, así que la partición final se sortea de nuevo: de 100 sorteos de bloques
+@valavi2019blockcv se elige el que deja la proporción de celdas de cada clase en validación más
+cerca de la proporción general, es decir, una partición estratificada por clase
+@kohavi1995study. Se cuentan celdas y no la clase del centro del recorte, porque el Dice se
+calcula sobre celdas y un recorte centrado en cultivo suele ser en su mayoría otra clase.
+
+*Sensibilidad del piloto y segunda tanda.* La proporción 80/20 con la que el piloto separó
+entrenamiento y validación no tiene fuente. Por eso el piloto se repitió con 50/50, 90/10 y 95/5
+sobre los mismos recortes: son, junto con 80/20, las particiones en 2, 5, 10 y 20 partes que
+compara #cite(<kohavi1995study>, form: "prose"). Las cuatro dicen que faltan recortes; la
+paciencia (17 a 24), el tope de épocas (100 o 300) y la muestra del Random Forest (25.000 a
+200.000 celdas) se mueven, así que se mantienen las del 80/20 y se informa el rango. La cantidad
+inicial de 2.000 recortes tampoco tenía fuente: se fija midiendo con la curva de aprendizaje
+@ning2020training. Se descargó una segunda tanda y quedaron 3.852 recortes, 687 de ellos en la
+reserva de test (333 bloques). El Random Forest a 30 m llegó a 0,821 con 25.000 celdas por
+árbol, cerca de la mejor U-Net del piloto (0,827).
+
+*Separación entre particiones.* Los bloques de 6 km evitan que un mismo bloque caiga en dos
+particiones, pero dos recortes de bloques vecinos pueden quedar a menos del alcance de la
+autocorrelación. En el primer piloto, 75 pares de recortes de entrenamiento y validación tenían
+sus centros a menos de 2,7 km, así que podían compartir terreno. Desde el tercer piloto se deja
+afuera todo recorte que tenga algún píxel a menos de 5.161 m (el mayor alcance medido en los
+semivariogramas) de un recorte de otra partición @roberts2017crossvalidation: primero los del
+resto cerca de test y, después de sortear validación, los de entrenamiento cerca de validación.
+Cuesta caro: en el tercer piloto, de 3.165 recortes fuera de test quedaron 1.552 para entrenar
+y 502 para validar. La misma distancia se aplica a las tres regiones reservadas: al construir los
+recortes solo se los había mantenido fuera de las cajas, y una revisión de independencia
+(10 de noviembre de 2026) encontró 23 recortes de entrenamiento, validación o test a menos de
+5.161 m, el más cercano a 1.397 m. La misma revisión extendió la regla al AOI del caso de
+estudio, donde se evalúa la precisión (6 recortes de entrenamiento y 2 de test estaban a menos de
+esa distancia), y al área de desarrollo, donde se elige el filtro del mapa de cambio (un recorte
+de entrenamiento, en 2019 y 2023, estaba adentro). En la partición final, con los 5.749 recortes,
+quedan 1.973 para entrenar, 655 para validar y 975 para test; 2.146 quedan afuera por la
+separación. Un chequeo independiente confirma que ningún recorte usado queda a menos de 5.161 m de
+otra partición, de las regiones reservadas, del AOI o del área de desarrollo.
+
+*Tercer piloto y reglas congeladas.* El tercer piloto repite el primero con todos los recortes,
+con la separación anterior y con dos correcciones del código (una clase ausente de la referencia
+y de la predicción ya no suma un Dice de 1, y validación se mide sobre el recorte entero). Como
+cada piloto ajustó el diseño del siguiente, su documento registrado fija de una vez todas las
+reglas que quedan: la partición final, la selección y el test. Un cambio posterior pasa a ser
+una enmienda con fecha. Dos de esas reglas son convenciones declaradas. El tamaño de validación
+no puede superar el de la validación provisoria del piloto (291 bloques tras la tercera tanda,
+según una enmienda del 23 de octubre de 2026), porque con la separación una validación más
+grande le quita recortes al entrenamiento y la selección entrenaría con menos datos de los que
+usó el piloto para medir sus reglas. Si la curva sigue subiendo, se descarga a lo sumo una
+tanda más, y después se sigue igual y se informa como limitación. Con la tercera tanda (5.749
+recortes) la curva todavía sube (0,772, 0,797, 0,807 y 0,815 con el 25, 50, 75 y 100 %), así que
+no se descargan más y se informa como limitación; quedan una paciencia de 16 épocas, un tope de
+100 y 25.000 celdas por árbol. La última regla fija el hardware: la misma semilla no garantiza el
+mismo resultado en otra plataforma @pytorchreproducibility, así que toda la selección y el test
+corren en un mismo modelo de GPU, el script se detiene si encuentra otro y, si ese modelo deja de
+estar disponible, la selección se repite entera en el nuevo.
+
 == Detección de cambio y evaluación de exactitud
 
 *Cambio bosque/no bosque con post-proceso pre-registrado.* El primer mapa de cambio del AOI
@@ -100,7 +221,9 @@ configuraciones, la que menos pérdida falsa deja en el AOI sin perder más de l
 pérdida confirmada en un área de desarrollo con deforestación real. Con la CNN final
 quedó elegida confianza ≥ 0,9 en ambas fechas, persistencia en 2022 y unidad mínima de
 mapeo: pérdida mapeada de 8,1 ha. (Con CNN anteriores, la misma regla había dejado 81,9 ha
-y 7,6 ha.)
+y 7,6 ha.) Para la U-Net la regla cambia en un punto: la pérdida falsa se mide en el bosque
+estable confirmado del área de desarrollo y no en el AOI, para que el AOI, donde se evalúa la
+exactitud, no intervenga en la elección del filtro. La regla nueva se registra antes de puntuar.
 
 *Evaluación contra referencia independiente.* La exactitud medida hasta ahí es acuerdo con
 otros mapas, no con el terreno. El test final usa la vara que el propio proyecto del caso

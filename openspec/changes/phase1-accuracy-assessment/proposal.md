@@ -19,6 +19,7 @@ Measuring the classifier against that same bar is what makes the Fase 4 audit co
 - Estimate error-adjusted forest-loss and forest-gain areas with 95% confidence intervals (Olofsson et al., 2014). These replace mapped pixel counts as the area figure handed to Fase 2.
 - Assess 2023 forest/non-forest accuracy against interpreted reference samples in the three held-out regions (~100 points each), so generalization is measured against reference data, not only against WorldCover. This part does not block Fase 2.
 - Measure interpreter consistency with a blind repeat of a 20% subset, by a second interpreter if available.
+- Assess MapBiomas Chaco Collection 5 (the training labels) and MapBiomas Paraguay Collection 3 (the national product) against the same reference points, with the same estimators, and report how much the two collections agree. The two cover the study area but are separate classifications, with their own legends, samples and collection years; whether they are nearly the same is measured, not assumed. If the 2019-2023 loss is similar with both, the result does not depend on having trained on MapBiomas Chaco; if it differs, the gap quantifies label uncertainty that carries into the carbon estimate. Training does not change.
 - Record the outcome as a decision gate.
 
 ## Capabilities
@@ -36,4 +37,5 @@ Measuring the classifier against that same bar is what makes the Fase 4 audit co
 - **New versioned reference dataset** (points, labels, interpreter notes, KML for interpretation) and results under `data/study_area/accuracy_assessment/`, archived as VM0007 requires.
 - **Reference imagery:** Google Earth Pro historical imagery, with Esri World Imagery Wayback as a secondary source. Planet NICFI is used only if access is granted; the program's contract with Planet ended in 2025 and the project's service account has no access.
 - **Manual effort:** 340 AOI points plus ~300 held-out points, plus ~130 repeats, each interpreted in one view with crown counted on a 5×5 grid. Estimated at ~8 hours, not yet measured. The AOI part (~4-5 hours) blocks Fase 2.
+- **New data source for evaluation only:** MapBiomas Paraguay Collection 3 (1985-2025, 30 m, Google Earth Engine), sampled at the reference points and over the AOI. It never reaches training, and the labeling tool never shows it.
 - **Updates** `docs/METODOLOGIA_PIPELINE.md` and `docs/FOUNDATION.md`/`FOUNDATION.es.md` (evaluation, point 7).
