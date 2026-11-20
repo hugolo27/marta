@@ -56,9 +56,10 @@ def _(mo):
     **prueba** times two epochs per tile size and writes nothing to `results.json`.
     **seleccion** runs the real grid. The first selection session pins the commit, the GPU and the PyTorch
     version; later sessions refuse to run if any of them changed (README, Hardware).
-    **test** runs the loop of `38 test` once, on the same commit and GPU. Each seed is pushed to
-    `test_runs.json` as it ends, so a reclaimed sandbox resumes at the next run; the seed 42 checkpoint
-    (the final model) and the final `results.json` also go to `molab-state`.
+    **test** runs the runs of `38 test` once, on the same commit and GPU: the five U-Nets, then the five
+    Random Forests, each in its own process. Each run is pushed to `test_runs.json` as it ends, so a
+    reclaimed sandbox resumes at the next one; the seed 42 checkpoint (the final model) and the final
+    `results.json` also go to `molab-state`.
     """)
     return
 
@@ -177,12 +178,11 @@ def _(STATE_DIR, git, shutil):
 
 @app.cell
 def _(REPO, os, subprocess, sys):
-    def run_38(stage):
-        return subprocess.Popen([sys.executable, "scripts/38_unet_selection.py", stage], cwd=REPO, text=True,
-                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+    def run_py(*args):
+        return subprocess.Popen([sys.executable, *args], cwd=REPO, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 # molab's Python does not put the script's own folder on the path, so 38 cannot import its siblings
                                 env={**os.environ, "MLFLOW_DISABLE_AGENT_HINT": "1", "PYTHONPATH": str(REPO / "scripts")})
-    return (run_38,)
+    return (run_py,)
 
 
 @app.cell
@@ -234,7 +234,7 @@ def _(commit, datetime, json, push, sessions, timezone, torch_info):
 
 
 @app.cell
-def _(RESULTS, log_session, mo, mode, push, run_38, threading, time):
+def _(RESULTS, log_session, mo, mode, push, run_py, threading, time):
     mo.stop(mode.value != "seleccion")
     log_session("score")
 
@@ -247,7 +247,7 @@ def _(RESULTS, log_session, mo, mode, push, run_38, threading, time):
                 seen["mtime"] = RESULTS.stat().st_mtime
                 push(RESULTS, "results.json")
 
-    proc = run_38("score")
+    proc = run_py("scripts/38_unet_selection.py", "score")
 
     def watch():
         while proc.poll() is None:
@@ -264,7 +264,23 @@ def _(RESULTS, log_session, mo, mode, push, run_38, threading, time):
 
 
 @app.cell
-def _(RESULTS, STATE_DIR, json, log_session, mo, mode, push, selection_script, unet):
+def _():
+    # One Random Forest test run in a fresh process, as in the selection: run next to the U-Net in the kernel,
+    # its n_jobs=-1 copies are the likely cause of the sandbox being reclaimed during the test
+    RF_TEST = """
+import importlib, json, sys
+s = importlib.import_module("38_unet_selection")
+seed, sel = int(sys.argv[1]), json.loads(s.RESULTS_PATH.read_text())["selection"]
+data, decisions = s.splits(), s.pilot_decisions()
+rf = s.train_rf.train_tiles(data["train"], seed=seed, max_samples=decisions["rf_max_samples"], **sel["rf"])
+dice, macro = s.classifier_report.dice_from_counts(s.train_rf.predict_counts_tiles(rf, data["test"]).sum(axis=0))
+print(json.dumps({"seed": seed, "macro_dice": float(macro), "dice": dict(zip(s.dl.CLASS_NAMES, dice.tolist()))}))
+"""
+    return (RF_TEST,)
+
+
+@app.cell
+def _(RESULTS, RF_TEST, STATE_DIR, json, log_session, mo, mode, push, run_py, selection_script, unet):
     mo.stop(mode.value != "test")
     _s = selection_script
     _s.check_preregistration()
@@ -274,35 +290,47 @@ def _(RESULTS, STATE_DIR, json, log_session, mo, mode, push, selection_script, u
     _s.check_hardware(_results)
     log_session("test")
     _data, _decisions, _sel = _s.splits(), _s.pilot_decisions(), _results["selection"]
-    # Same loop as 38 test, but each seed is pushed as it ends: a reclaimed sandbox loses one run, not ten
+    # Same runs as 38 test, but each one is pushed as it ends: a reclaimed sandbox loses one run, not ten.
+    # All U-Nets first, then all Random Forests: every run has its own seed, so the order changes no score
     try:
         _runs = json.loads((STATE_DIR / "test_runs.json").read_text())
     except FileNotFoundError:
         _runs = {"unet": {}, "rf": {}}
 
-    def _record(model, seed, counts):
-        dice, macro = _s.classifier_report.dice_from_counts(counts.sum(axis=0))
-        _runs[model][str(seed)] = {"seed": seed, "macro_dice": float(macro), "dice": dict(zip(_s.dl.CLASS_NAMES, dice.tolist()))}
+    def _record(model, run):
+        _runs[model][str(run["seed"])] = run
         with open("test_runs.json", "w") as f:
             json.dump(_runs, f, indent=2)
         push("test_runs.json", "test_runs.json")
-        print(f"seed {seed}: {model} test macro Dice {macro:.4f}, pushed", flush=True)
+        print(f"seed {run['seed']}: {model} test macro Dice {run['macro_dice']:.4f}, pushed", flush=True)
 
     for _seed in _s.selection.SEEDS:
-        if str(_seed) not in _runs["unet"]:
-            print(f"seed {_seed}: training U-Net {_sel['unet']}", flush=True)
-            _model, _device, _ = unet.train(_data["train"], _data["val"], seed=_seed, max_epochs=_sel["unet_max_epochs"],
-                                            patience=_decisions["patience"] or _decisions["max_epochs"], verbose=True,
-                                            random_window=True, **_sel["unet"])
-            if _seed == 42:
-                # Before the score: once seed 42 is recorded it is never retrained, so its checkpoint must already be up
-                unet.save_checkpoint(_model, _seed)
-                push(unet.CHECKPOINT_PATH, "unet_checkpoint.pt")
-            _record("unet", _seed, unet.predict_counts_full(_model, _data["test"], _device))
-        if str(_seed) not in _runs["rf"]:
-            print(f"seed {_seed}: training Random Forest {_sel['rf']}", flush=True)
-            _rf = _s.train_rf.train_tiles(_data["train"], seed=_seed, max_samples=_decisions["rf_max_samples"], **_sel["rf"])
-            _record("rf", _seed, _s.train_rf.predict_counts_tiles(_rf, _data["test"]))
+        if str(_seed) in _runs["unet"]:
+            continue
+        print(f"seed {_seed}: training U-Net {_sel['unet']}", flush=True)
+        _model, _device, _ = unet.train(_data["train"], _data["val"], seed=_seed, max_epochs=_sel["unet_max_epochs"],
+                                        patience=_decisions["patience"] or _decisions["max_epochs"], verbose=True,
+                                        random_window=True, **_sel["unet"])
+        if _seed == 42:
+            # Before the score: once seed 42 is recorded it is never retrained, so its checkpoint must already be up
+            unet.save_checkpoint(_model, _seed)
+            push(unet.CHECKPOINT_PATH, "unet_checkpoint.pt")
+            print("seed 42: unet_checkpoint.pt pushed", flush=True)
+        _dice, _macro = _s.classifier_report.dice_from_counts(unet.predict_counts_full(_model, _data["test"], _device).sum(axis=0))
+        _record("unet", {"seed": _seed, "macro_dice": float(_macro), "dice": dict(zip(_s.dl.CLASS_NAMES, _dice.tolist()))})
+
+    for _seed in _s.selection.SEEDS:
+        if str(_seed) in _runs["rf"]:
+            continue
+        print(f"seed {_seed}: training Random Forest {_sel['rf']}", flush=True)
+        _proc = run_py("-c", RF_TEST, str(_seed))
+        _lines = []
+        for _line in _proc.stdout:
+            print(_line, end="", flush=True)
+            _lines.append(_line)
+        if _proc.wait():
+            raise RuntimeError(f"Random Forest seed {_seed} exited with {_proc.returncode}")
+        _record("rf", json.loads(_lines[-1]))
 
     _results["test"] = {m: [_runs[m][str(seed)] for seed in _s.selection.SEEDS] for m in ("unet", "rf")}
     _s.save(_results)
