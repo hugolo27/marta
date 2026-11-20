@@ -1,10 +1,12 @@
-"""Grad-CAM (+ Guided Grad-CAM) for the operational CNN, phase1-grad-cam tasks 1.1-2.2. Hooks
-SmallCNN's last conv block (128 channels, 8x8 spatial on a 33x33 input -- the only layer with
-spatial structure left before AdaptiveAvgPool2d(1) collapses it) rather than a library, matching
-this project's homegrown-over-dependency preference for small, well-understood algorithms
-(design.md). CNN-only by construction: Random Forest has no gradients or spatial activation maps
-for Grad-CAM to attach to.
-Usage: .venv/bin/python scripts/21_grad_cam.py"""
+"""Seg-Grad-CAM (+ guided backpropagation) for the operational U-Net (phase1-segmentation D6). For
+segmentation the score explained is the class logit summed over a region of the output, not one
+label per patch (Vinogradova et al., 2020); the rest is Grad-CAM (Selvaraju et al., 2017): spatially
+averaged gradients of that score as per-channel weights of the target layer's activations, ReLU of
+the weighted sum. The target layer is the bottleneck (the last encoder block, 6x6 on a 48 px window),
+the one Vinogradova et al. show, and the map is sharpened with guided backpropagation at 10 m, as
+the CNN's was. Hooks are homegrown, not a library, as before; Random Forest has no gradients or
+activation maps for this to attach to. The 33x33 CNN version is in git history.
+Usage: .venv/bin/python scripts/21_grad_cam.py (class-specificity check on a training tile)"""
 
 import importlib
 from pathlib import Path
@@ -17,55 +19,11 @@ import torch.nn.functional as F
 
 import dataset_loader as dl
 
-train_cnn = importlib.import_module("10_train_cnn")
+unet = importlib.import_module("36_train_unet")
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 OUT_DIR = REPO_ROOT / "data" / "study_area"
 RGB_IDX = [3, 2, 1]  # B4, B3, B2 in S2_BANDS, matches 13_visualize_classification_map.py
-
-
-class GradCAM:
-    """Standard Grad-CAM (Selvaraju et al. 2017): global-average-pooled gradients as per-channel
-    weights, ReLU on the weighted activation sum. One instance is scoped to a single forward+
-    backward pass -- always used through guided_grad_cam(), never left registered on the model."""
-
-    def __init__(self, model):
-        if not isinstance(model, train_cnn.SmallCNN):
-            raise TypeError(
-                "Grad-CAM only applies to the operational CNN -- Random Forest has no gradients "
-                "or spatial activation maps to attach to (structural, not a missing feature)."
-            )
-        self.model = model
-        self.target_layer = model.features[-1]  # last ReLU of the 3rd conv block
-        self.activations = None
-        self.gradients = None
-        self._fh = self.target_layer.register_forward_hook(self._forward_hook)
-        self._bh = self.target_layer.register_full_backward_hook(self._backward_hook)
-
-    def _forward_hook(self, module, inputs, output):
-        self.activations = output.detach()
-
-    def _backward_hook(self, module, grad_input, grad_output):
-        self.gradients = grad_output[0].detach()
-
-    def raw_cam(self, patch_chw, target_class, device):
-        """patch_chw: (13, 33, 33) tensor. Returns the native 8x8 CAM, min-max normalized to
-        [0, 1] -- attributed to target_class specifically (a different target_class on the same
-        patch produces a different CAM, verified in main() rather than assumed)."""
-        self.model.zero_grad()
-        x = patch_chw.unsqueeze(0).to(device)
-        logits = self.model(x)
-        score = logits[0, target_class]
-        score.backward()
-
-        weights = self.gradients.mean(dim=(2, 3), keepdim=True)
-        cam = torch.relu((weights * self.activations).sum(dim=1, keepdim=True))
-        cam = cam.squeeze().cpu().numpy()
-        return _minmax(cam)
-
-    def remove(self):
-        self._fh.remove()
-        self._bh.remove()
 
 
 def _minmax(arr):
@@ -73,84 +31,67 @@ def _minmax(arr):
     return (arr - lo) / (hi - lo + 1e-8)
 
 
-def upsample_cam(cam, size, patch_px=33):
-    """A 3x3-input CNN only sees the central block, so its CAM is drawn over that block and left at
-    zero elsewhere instead of being stretched over the whole patch (phase1-patch-size D5)."""
-    t = torch.from_numpy(cam).float()[None, None]
-    up = F.interpolate(t, size=(patch_px, patch_px), mode="bilinear", align_corners=False)[0, 0].numpy()
-    canvas = np.zeros((size, size), dtype=up.dtype)
-    start = (size - patch_px) // 2
-    canvas[start:start + patch_px, start:start + patch_px] = up
-    return canvas
+def region_score(logits, region_10m, target_class):
+    return (logits[0, target_class] * region_10m).sum()
 
 
-def _register_guided_relu_hooks(model):
-    """Guided backpropagation: on top of ReLU's own backward (zeroing where the forward
-    activation was <=0), also zero incoming gradients that are negative -- the "guided" half of
-    Guided Grad-CAM. Hooks are removed right after use (guided_backprop_saliency's `finally`),
-    never left registered for the model's ordinary forward/backward passes elsewhere."""
-    handles = []
-
-    def hook(module, grad_input, grad_output):
-        return (torch.clamp(grad_input[0], min=0.0),)
-
-    for module in model.modules():
-        if isinstance(module, nn.ReLU):
-            handles.append(module.register_full_backward_hook(hook))
-    return handles
-
-
-def guided_backprop_saliency(model, patch_chw, target_class, device):
-    """Pixel-level saliency at the input's own 33x33 resolution -- not class-discriminative on
-    its own (same edges light up regardless of target_class), only useful combined with
-    Grad-CAM's class-specific localization (guided_grad_cam)."""
-    handles = _register_guided_relu_hooks(model)
+def seg_grad_cam(model, window_chw, region_10m, target_class, device):
+    """window_chw: (26, S, S) float tensor; region_10m: (S, S) 0/1 tensor. Returns the native CAM
+    of the bottleneck, normalized to [0, 1]."""
+    if not isinstance(model, unet.UNet):
+        raise TypeError("Seg-Grad-CAM applies to the U-Net only: Random Forest has no gradients or activation maps")
+    store = {}
+    layer = model.down[-1]
+    fh = layer.register_forward_hook(lambda m, i, o: store.update(act=o.detach()))
+    bh = layer.register_full_backward_hook(lambda m, gi, go: store.update(grad=go[0].detach()))
     try:
         model.zero_grad()
-        x = patch_chw.clone().unsqueeze(0).to(device)
-        x.requires_grad_(True)
-        logits = model(x)
-        score = logits[0, target_class]
-        score.backward()
-        saliency = x.grad.detach().squeeze(0).abs().amax(dim=0)  # max over 13 input channels
-        return _minmax(saliency.cpu().numpy())
+        region_score(model(window_chw[None].to(device)), region_10m.to(device), target_class).backward()
+    finally:
+        fh.remove()
+        bh.remove()
+    weights = store["grad"].mean(dim=(2, 3), keepdim=True)
+    cam = torch.relu((weights * store["act"]).sum(dim=1))[0]
+    return _minmax(cam.cpu().numpy())
+
+
+def guided_backprop_saliency(model, window_chw, region_10m, target_class, device):
+    """Pixel-level saliency at 10 m: negative gradients are zeroed at every LeakyReLU on the way
+    back. Not class-discriminative on its own, only combined with the CAM."""
+    handles = [m.register_full_backward_hook(lambda m, gi, go: (torch.clamp(gi[0], min=0.0),))
+               for m in model.modules() if isinstance(m, nn.LeakyReLU)]
+    try:
+        model.zero_grad()
+        x = window_chw.clone()[None].to(device).requires_grad_(True)
+        region_score(model(x), region_10m.to(device), target_class).backward()
+        return _minmax(x.grad.detach()[0].abs().amax(dim=0).cpu().numpy())
     finally:
         for h in handles:
             h.remove()
 
 
-def guided_grad_cam(model, patch_chw, target_class, device):
-    """Combines Grad-CAM (knows the class, 8x8 native) with guided backprop (33x33 native,
-    doesn't know the class) by elementwise multiplication -- keeps only the fine detail inside
-    the region Grad-CAM already identified as relevant, rather than fabricating resolution
-    (design.md). Returns the raw 8x8 CAM, its upsample, the guided saliency, and the combined
-    sharpened map, all normalized to [0, 1] -- the 8x8-vs-33x33 native resolutions are kept
-    visible in the return value rather than hidden."""
-    gc = GradCAM(model)
-    try:
-        raw_cam = gc.raw_cam(patch_chw, target_class, device)
-    finally:
-        gc.remove()
-    cam_upsampled = upsample_cam(raw_cam, size=patch_chw.shape[-1], patch_px=model.patch_px)
-    saliency = guided_backprop_saliency(model, patch_chw, target_class, device)
-    sharpened = _minmax(cam_upsampled * saliency)
-    return {
-        "raw_cam_8x8": raw_cam, "cam_upsampled": cam_upsampled,
-        "guided_saliency": saliency, "sharpened": sharpened,
-    }
+def guided_seg_grad_cam(model, window_chw, region_10m, target_class, device):
+    """The CAM (knows the class, 6x6 native) upsampled to the window and multiplied by the guided
+    saliency (10 m, does not know the class): keeps only the detail inside what the CAM already
+    marks, without making up resolution. The native CAM stays in the result."""
+    raw = seg_grad_cam(model, window_chw, region_10m, target_class, device)
+    size = window_chw.shape[-1]
+    up = F.interpolate(torch.from_numpy(raw)[None, None].float(), size=(size, size), mode="bilinear", align_corners=False)[0, 0].numpy()
+    saliency = guided_backprop_saliency(model, window_chw, region_10m, target_class, device)
+    return {"raw_cam": raw, "cam_upsampled": up, "guided_saliency": saliency, "sharpened": _minmax(up * saliency)}
 
 
-def render_overlay(patch_hwc, heatmap, title, out_path, cam_px=8):
-    """Overlay on true color, not a bare heatmap -- same true-color normalization as
-    13_visualize_classification_map.py (B4/B3/B2, /3000 clipped to [0,1])."""
-    rgb = np.clip(patch_hwc[:, :, RGB_IDX] / 3000, 0, 1)
+def render_overlay(window_hwc, heatmap, region_10m, title, out_path, cam_px):
+    """Overlay on true color (B4/B3/B2, /3000 clipped to [0, 1]), with the explained region outlined."""
+    rgb = np.clip(window_hwc[:, :, RGB_IDX] / 3000, 0, 1)
     fig, axes = plt.subplots(1, 2, figsize=(6, 3.2))
     axes[0].imshow(rgb)
     axes[0].set_title("True color")
     axes[1].imshow(rgb)
     axes[1].imshow(heatmap, cmap="jet", alpha=0.5)
-    axes[1].set_title(f"Guided Grad-CAM ({cam_px}x{cam_px} native)")
+    axes[1].set_title(f"Guided Seg-Grad-CAM ({cam_px}x{cam_px} native)")
     for ax in axes:
+        ax.contour(region_10m, levels=[0.5], colors="white", linewidths=1)
         ax.axis("off")
     fig.suptitle(title, fontsize=10)
     fig.tight_layout()
@@ -159,40 +100,28 @@ def render_overlay(patch_hwc, heatmap, title, out_path, cam_px=8):
 
 
 def main():
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    model, device = train_cnn.load_checkpoint(device=device)
-    print(f"Loaded checkpoint: {train_cnn.CHECKPOINT_PATH}")
+    """The CAM must depend on the class explained: on one window of a training tile, the predicted
+    class and another class over the same region give different maps; and a non-U-Net is refused."""
+    import glob
+    import json
 
-    # Task 1.2: confirm the CAM is attributed to the predicted class specifically, not a fixed
-    # class -- compare it against a different target class on the same patch.
-    example_row = dl.load_manifest("train")[0]
-    example_patch = np.load(REPO_ROOT / example_row["path"]).astype(np.float32)
-    example_chw = torch.from_numpy(np.ascontiguousarray(example_patch.transpose(2, 0, 1)))
-    pred_class = int(model(example_chw.unsqueeze(0).to(device)).argmax(1).item())
-    other_class = (pred_class + 1) % len(dl.CLASS_NAMES)
-    cam_pred = guided_grad_cam(model, example_chw, pred_class, device)["raw_cam_8x8"]
-    cam_other = guided_grad_cam(model, example_chw, other_class, device)["raw_cam_8x8"]
-    cam_diff = float(np.abs(cam_pred - cam_other).mean())
-    print(f"Sanity check: CAM(predicted class) vs CAM(other class) mean abs diff = {cam_diff:.4f} "
-          f"({'class-specific, good' if cam_diff > 0.01 else 'WARNING: barely differs'})")
-
-    # Task 1.3: refuse for a non-CNN model.
+    model, device = unet.load_checkpoint()
+    path = next(p for p in sorted(glob.glob(str(dl.TILES_DIR / "data" / "*.json"))) if json.loads(Path(p).read_text())["kept"])
+    image, _ = dl.load_tile(json.loads(Path(path).read_text())["path"], model.tile_px)
+    window = torch.from_numpy(np.ascontiguousarray(dl.tile_to_float(image).transpose(2, 0, 1)))
+    with torch.no_grad():
+        pred = unet.probs_30m(model(window[None].to(device)))[0].argmax(0).cpu().numpy()
+    cls = int(np.bincount(pred.ravel()).argmax())
+    region = torch.from_numpy(np.kron(pred == cls, np.ones((3, 3)))).float()
+    cam_pred = seg_grad_cam(model, window, region, cls, device)
+    cam_other = seg_grad_cam(model, window, region, (cls + 1) % len(dl.CLASS_NAMES), device)
+    diff = float(np.abs(cam_pred - cam_other).mean())
+    print(f"CAM({dl.CLASS_NAMES[cls]}) vs CAM(other class) over the same region, mean abs diff = {diff:.4f} "
+          f"({'class-specific' if diff > 0.01 else 'WARNING: barely differs'})")
     try:
-        GradCAM(model="not a model")
+        seg_grad_cam("not a model", window, region, cls, device)
     except TypeError as e:
-        print(f"Sanity check: non-CNN input correctly refused -- {e}")
-
-    # Task 2.2: one example overlay per class.
-    for class_name in dl.CLASS_NAMES:
-        row = next(r for r in dl.load_manifest("train") if r["class"] == class_name)
-        patch = np.load(REPO_ROOT / row["path"]).astype(np.float32)
-        patch_chw = torch.from_numpy(np.ascontiguousarray(patch.transpose(2, 0, 1)))
-        pred = int(model(patch_chw.unsqueeze(0).to(device)).argmax(1).item())
-        result = guided_grad_cam(model, patch_chw, pred, device)
-        out_path = OUT_DIR / f"gradcam_example_{class_name}.png"
-        render_overlay(patch, result["sharpened"], f"{class_name} (predicted: {dl.CLASS_NAMES[pred]})", out_path,
-                       cam_px=result["raw_cam_8x8"].shape[0])
-        print(f"saved: {out_path}")
+        print(f"non-U-Net refused: {e}")
 
 
 if __name__ == "__main__":

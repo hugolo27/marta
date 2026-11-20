@@ -67,6 +67,13 @@ def area_grid(epsg, part, tile_px):
     return {"epsg": epsg, "x0": x0, "y0": y0, "width": width, "height": height, "tile_px": tile_px}
 
 
+def grid_from_meta(meta):
+    """The grid 18 saved with its rasters, in the form the functions here take."""
+    minx, _, _, maxy = meta["aoi_utm_bounds"]
+    return {"epsg": int(meta["utm_crs"].split(":")[1]), "x0": minx, "y0": maxy,
+            "width": meta["n_cols"] * 3, "height": meta["n_rows"] * 3, "tile_px": meta["tile_px"]}
+
+
 def grid_region(grid):
     """The grid as an Earth Engine rectangle, the region a composite for it is built over."""
     return ee.Geometry.Rectangle([grid["x0"], grid["y0"] - grid["height"] * 10, grid["x0"] + grid["width"] * 10, grid["y0"]],

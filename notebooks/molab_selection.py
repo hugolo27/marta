@@ -60,6 +60,11 @@ def _(mo):
     Random Forests, each in its own process. Each run is pushed to `test_runs.json` as it ends, so a
     reclaimed sandbox resumes at the next one; the seed 42 checkpoint (the final model) and the final
     `results.json` also go to `molab-state`.
+    **semillas** retrains the U-Nets of seeds 1, 7, 123 and 2026 exactly as the test did, on the same
+    commit and GPU, and pushes each checkpoint to `molab-state`: the held-out regions are scored with
+    the five seeds of the test, and the test only kept seed 42. Each retrained model is scored on the
+    test split again only to check it is the same model: its macro Dice must equal the one in
+    `test_runs.json`, or the cell stops and the checkpoint is not used.
     """)
     return
 
@@ -68,7 +73,7 @@ def _(mo):
 def _(mo):
     drive_url = mo.ui.text(label="Drive link to tiles_used.zip", full_width=True)
     gh_token = mo.ui.text(kind="password", label="GitHub token (contents: write on hugolo27/marta)")
-    mode = mo.ui.dropdown(["prueba", "seleccion", "test"], value="prueba", label="Mode")
+    mode = mo.ui.dropdown(["prueba", "seleccion", "test", "semillas"], value="prueba", label="Mode")
     start = mo.ui.run_button(label="Run")
     mo.vstack([drive_url, gh_token, mode, start])
     return drive_url, gh_token, mode, start
@@ -355,6 +360,35 @@ def _(Path, RESULTS, RF_TEST, STATE_DIR, json, log_session, mo, mode, os, push, 
     for _name, _r in _results["test"].items():
         _macro = [r["macro_dice"] for r in _r]
         print(f"{_name}: test macro Dice {_s.np.mean(_macro):.4f} +/- {_s.np.std(_macro, ddof=1):.4f}")
+    return
+
+
+@app.cell
+def _(RESULTS, STATE_DIR, json, log_session, mo, mode, push, selection_script, unet):
+    mo.stop(mode.value != "semillas")
+    _s = selection_script
+    _results = json.loads(RESULTS.read_text())
+    _s.check_hardware(_results)
+    log_session("checkpoints")
+    _data, _decisions, _sel = _s.splits(), _s.pilot_decisions(), _results["selection"]
+    _test = json.loads((STATE_DIR / "test_runs.json").read_text())["unet"]
+    for _seed in [s for s in _s.selection.SEEDS if s != 42]:
+        _name = f"unet_checkpoint_seed{_seed}.pt"
+        if (STATE_DIR / _name).exists():
+            print(f"seed {_seed}: {_name} already in molab-state", flush=True)
+            continue
+        print(f"seed {_seed}: training U-Net {_sel['unet']}", flush=True)
+        _model, _device, _ = unet.train(_data["train"], _data["val"], seed=_seed, max_epochs=_sel["unet_max_epochs"],
+                                        patience=_decisions["patience"] or _decisions["max_epochs"], verbose=True,
+                                        random_window=True, **_sel["unet"])
+        _, _macro = _s.classifier_report.dice_from_counts(unet.predict_counts_full(_model, _data["test"], _device).sum(axis=0))
+        _recorded = _test[str(_seed)]["macro_dice"]
+        print(f"seed {_seed}: test macro Dice {_macro:.6f}, recorded {_recorded:.6f}", flush=True)
+        if abs(_macro - _recorded) > 1e-6:
+            raise RuntimeError(f"seed {_seed} is not the model of the test: checkpoint not saved")
+        unet.save_checkpoint(_model, _seed, path=unet.OUT_DIR / _name)
+        push(unet.OUT_DIR / _name, _name)
+        print(f"seed {_seed}: {_name} pushed", flush=True)
     return
 
 

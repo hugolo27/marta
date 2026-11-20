@@ -1,125 +1,94 @@
-"""Explains a detected temporal transition with Grad-CAM, phase1-grad-cam tasks 3.1-3.2. Picks
-the same hand-picked pixels as 19_temporal_change_map.py's own visual check (its largest
-detected transition), extracts each one's 33x33 window for both 2019 and 2023, and renders
-Grad-CAM overlays for both dates side by side -- evidence for *why* the CNN called each half of
-the transition, not just that the diff changed.
+"""Explains forest loss in the AOI's change map with Seg-Grad-CAM (phase1-segmentation D6). For a
+few loss cells of the filtered forest/non-forest map (change_map_2019_2023_fnf.npy), the region
+explained is the whole connected loss patch the cell belongs to, and the window is the one of 18's
+classification grid whose center is nearest the cell. Both dates side by side: why the U-Net called
+the patch bosque in 2019 and what it called it in 2023.
 
-Extraction reuses 18_classify_aoi_temporal.py's own tile pull + array-slice window mechanism
-(pull_tile + the same local-offset slice classify_tile uses internally), NOT an independent small
-sampleRectangle() query at the pixel's own bounding box. Task 3.1's own verification step (compare
-the fresh prediction against the class already recorded in that date's raster) caught that the
-independent-query approach silently snapped to a different pixel grid than the tile pipeline did
--- close enough everywhere except right at boundary pixels like these, where it flipped the
-predicted class. Re-using the exact same tile array + slice is the only way to guarantee the
-identical window 18_classify_aoi_temporal.py itself classified on.
-
---fnf-loss explains forest-loss pixels of the hardened forest/non-forest map instead
-(change_map_2019_2023_fnf.npy, phase1-change-detection-hardening task 5.2), written to
-gradcam_loss_* so the named-transition images used elsewhere aren't overwritten.
-Usage: .venv/bin/python scripts/22_explain_transition.py [--fnf-loss]"""
-
-import argparse
+The window is pulled from 18's own grid, so it holds the exact pixels 18 classified. Checked per
+cell and date, as the CNN version was: re-predicting every window that covers the cell and
+averaging gives back the probability stored in that date's raster.
+Usage: .venv/bin/python scripts/22_explain_transition.py"""
 
 import importlib
 import json
 from pathlib import Path
 
-import ee
 import numpy as np
 import torch
-from shapely.ops import transform as shapely_transform
+from scipy import ndimage
 
 import dataset_loader as dl
 import gee_session
 import s2_utils
+import tile_inference
 
 classify_aoi = importlib.import_module("18_classify_aoi_temporal")
 change_map = importlib.import_module("19_temporal_change_map")
 grad_cam = importlib.import_module("21_grad_cam")
-train_cnn = importlib.import_module("10_train_cnn")
+unet = importlib.import_module("36_train_unet")
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = REPO_ROOT / "data" / "study_area"
-PATCH_RADIUS_PX = classify_aoi.PATCH_RADIUS_PX  # 16 -> 33x33, same alignment as training patches
-PATCH_SIZE_PX = 2 * PATCH_RADIUS_PX + 1
-PERIODS = {"2019": ("2019-06-01", "2019-09-30"), "2023": ("2023-06-01", "2023-09-30")}
+PERIODS = {"2019": classify_aoi.PERIODS["2019"], "2023": classify_aoi.PERIODS["2023"]}
 N_PIXELS = 2  # same count as 19's own visual check
-
-
-def pick_transition_pixels(change):
-    """Mirrors 19_temporal_change_map.py's visual_check() pixel-picking exactly, so the same
-    pixels get both a true-color visual check (there) and a Grad-CAM explanation (here) -- the
-    two checks corroborate each other (design.md, tasks.md 3.2)."""
-    codes, counts = np.unique(change, return_counts=True)
-    transition_counts = {c: n for c, n in zip(codes, counts) if c in change_map.TRANSITION_NAMES}
-    target = max(transition_counts, key=transition_counts.get)
-    rows, cols = np.where(change == target)
-    picks = np.linspace(0, len(rows) - 1, min(N_PIXELS, len(rows)), dtype=int)
-    return change_map.TRANSITION_NAMES[target], [(int(rows[i]), int(cols[i])) for i in picks]
+PROBA_TOLERANCE = 2e-3  # the stored probabilities are float16
 
 
 def pick_fnf_loss_pixels(change):
     rows, cols = np.where(change == change_map.LOSS)
     picks = np.linspace(0, len(rows) - 1, min(N_PIXELS, len(rows)), dtype=int)
-    return "forest_loss", [(int(rows[i]), int(cols[i])) for i in picks]
+    return [(int(rows[i]), int(cols[i])) for i in picks]
 
 
-def extract_patch(composite, channels, tiles, row, col):
-    """Pulls the whole padded tile containing (row, col) and slices out the exact 33x33 window
-    classify_tile() itself would use for that core pixel -- see module docstring for why this,
-    not a standalone small sampleRectangle() query."""
-    core_px = classify_aoi.TILE_CORE_PX
-    tile_row, tile_col = row // core_px, col // core_px
-    tile = next(t for t in tiles if t["row"] == tile_row and t["col"] == tile_col)
-    grid = classify_aoi.pull_tile(composite, channels, tile["padded_utm"])
-    local_r, local_c = row % core_px, col % core_px
-    return grid[local_r:local_r + PATCH_SIZE_PX, local_c:local_c + PATCH_SIZE_PX]
+def covering_windows(row, col, grid):
+    """Top-left corners (10 m px) of the grid's windows that cover cell (row, col)."""
+    size, step = grid["tile_px"], grid["tile_px"] // 2
+
+    def starts(cell, extent):
+        return [s for s in range(0, extent - size + 1, step) if s <= 3 * cell < s + size]
+    return [(r, c) for r in starts(row, grid["height"]) for c in starts(col, grid["width"])]
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--fnf-loss", action="store_true")
-    args = parser.parse_args()
-
     gee_session.init()
     meta = json.loads((DATA_DIR / "aoi_classified_grid_meta.json").read_text())
-    change = np.load(DATA_DIR / ("change_map_2019_2023_fnf.npy" if args.fnf_loss else "change_map_2019_2023.npy"))
+    grid = tile_inference.grid_from_meta(meta)
+    change = np.load(DATA_DIR / "change_map_2019_2023_fnf.npy")
     rasters = {p: np.load(DATA_DIR / f"aoi_classified_{p}.npy") for p in PERIODS}
-    model, device = train_cnn.load_checkpoint()
-    print(f"Loaded checkpoint: {train_cnn.CHECKPOINT_PATH}")
+    probas = {p: np.load(DATA_DIR / f"aoi_proba_{p}.npy") for p in PERIODS}
+    model, device = unet.load_checkpoint()
+    size = model.tile_px
+    patches, _ = ndimage.label(change == change_map.LOSS, structure=np.ones((3, 3), dtype=int))
+    predict = tile_inference.unet_predictor(model, device)
 
-    aoi_wgs84_shapely = classify_aoi.load_aoi_geom_wgs84()
-    aoi_m = shapely_transform(classify_aoi.to_utm, aoi_wgs84_shapely)
-    tiles, n_rows, n_cols = classify_aoi.build_tile_grid(aoi_m)
-    assert (n_rows, n_cols) == (meta["n_rows"], meta["n_cols"]), "tile grid drifted from 18's saved grid"
-    aoi_wgs84_ee = ee.Geometry(json.loads(classify_aoi.AOI_PATH.read_text())["features"][0]["geometry"])
-
-    transition_name, pixels = pick_fnf_loss_pixels(change) if args.fnf_loss else pick_transition_pixels(change)
-    out_prefix = "gradcam_loss" if args.fnf_loss else "gradcam_transition"
-    print(f"Explaining transition: {transition_name} ({len(pixels)} pixels)")
-
-    for i, (row, col) in enumerate(pixels):
+    for i, (row, col) in enumerate(pick_fnf_loss_pixels(change)):
         lon, lat = change_map.pixel_to_wgs84(row, col, meta)
-        print(f"\npixel {i}: (row={row}, col={col}) -> lon={lon:.5f}, lat={lat:.5f}")
+        windows = covering_windows(row, col, grid)
+        r0, c0 = min(windows, key=lambda rc: (rc[0] + size / 2 - 3 * row - 1.5) ** 2 + (rc[1] + size / 2 - 3 * col - 1.5) ** 2)
+        patch = patches == patches[row, col]
+        region = np.kron(patch[r0 // 3:(r0 + size) // 3, c0 // 3:(c0 + size) // 3], np.ones((3, 3)))
+        print(f"\ncell {i}: (row={row}, col={col}) -> lon={lon:.5f}, lat={lat:.5f}, loss patch of {int(patch.sum())} cells "
+              f"({int(region.sum() / 9)} inside the window)")
 
         for period, (start, end) in PERIODS.items():
-            composite, channels = s2_utils.build_season_composite(aoi_wgs84_ee, start, end, model.season,
-                                                                  reproject=True, clip=True)
-            patch = extract_patch(composite, channels, tiles, row, col)
-            patch_chw = torch.from_numpy(np.ascontiguousarray(patch.transpose(2, 0, 1)))
-            pred = int(model(patch_chw.unsqueeze(0).to(device)).argmax(1).item())
+            composite, channels = s2_utils.build_season_composite(tile_inference.grid_region(grid), start, end, "drywet", reproject=False)
+            fetch = tile_inference.gee_fetcher(grid, composite, channels)
+            rmin, cmin = min(r for r, _ in windows), min(c for _, c in windows)
+            span = dl.tile_to_float(fetch(rmin, cmin, max(r for r, _ in windows) - rmin + size, max(c for _, c in windows) - cmin + size))
+            probs = predict(span, [(r - rmin, c - cmin) for r, c in windows])
+            mean = np.mean([p[:, row - r // 3, col - c // 3] for p, (r, c) in zip(probs, windows)], axis=0)
+            diff = float(np.abs(mean - probas[period][row, col].astype(np.float32)).max())
             recorded = int(rasters[period][row, col])
-            match = "matches" if pred == recorded else "MISMATCH"
-            print(f"  {period}: fresh-pull prediction={dl.CLASS_NAMES[pred]}, "
-                  f"recorded={dl.CLASS_NAMES[recorded]} ({match})")
+            print(f"  {period}: recorded {dl.CLASS_NAMES[recorded]}, re-predicted probabilities differ by {diff:.1e} "
+                  f"({'matches' if diff < PROBA_TOLERANCE else 'MISMATCH'})")
 
-            result = grad_cam.guided_grad_cam(model, patch_chw, pred, device)
-            out_path = DATA_DIR / f"{out_prefix}_{i}_{period}.png"
-            grad_cam.render_overlay(
-                patch, result["sharpened"],
-                f"{transition_name} pixel {i}, {period} (predicted: {dl.CLASS_NAMES[pred]})",
-                out_path, cam_px=result["raw_cam_8x8"].shape[0],
-            )
+            window = span[r0 - rmin:r0 - rmin + size, c0 - cmin:c0 - cmin + size]
+            window_chw = torch.from_numpy(np.ascontiguousarray(window.transpose(2, 0, 1)))
+            result = grad_cam.guided_seg_grad_cam(model, window_chw, torch.from_numpy(region).float(), recorded, device)
+            out_path = DATA_DIR / f"gradcam_loss_{i}_{period}.png"
+            grad_cam.render_overlay(window, result["sharpened"], region,
+                                    f"forest loss patch {i}, {period} (explained: {dl.CLASS_NAMES[recorded]})",
+                                    out_path, cam_px=result["raw_cam"].shape[0])
             print(f"  saved: {out_path}")
 
 
