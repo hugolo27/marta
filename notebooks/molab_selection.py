@@ -265,17 +265,17 @@ def _(RESULTS, log_session, mo, mode, push, run_py, threading, time):
 
 @app.cell
 def _():
-    # One Random Forest test run in a fresh process, as in the selection: run next to the U-Net in the kernel,
-    # its n_jobs=-1 copies are the likely cause of the sandbox being reclaimed during the test
-    RF_TEST = """
-import importlib, json, sys
-s = importlib.import_module("38_unet_selection")
-seed, sel = int(sys.argv[1]), json.loads(s.RESULTS_PATH.read_text())["selection"]
-data, decisions = s.splits(), s.pilot_decisions()
-rf = s.train_rf.train_tiles(data["train"], seed=seed, max_samples=decisions["rf_max_samples"], **sel["rf"])
-dice, macro = s.classifier_report.dice_from_counts(s.train_rf.predict_counts_tiles(rf, data["test"]).sum(axis=0))
-print(json.dumps({"seed": seed, "macro_dice": float(macro), "dice": dict(zip(s.dl.CLASS_NAMES, dice.tolist()))}))
-"""
+    # One Random Forest test run in a fresh process, as in the selection: run in the kernel next to the U-Net,
+    # it ran out of memory. Lines joined, not a triple-quoted block: molab re-indents cell bodies and broke it
+    RF_TEST = "\n".join([
+        "import importlib, json, sys",
+        "s = importlib.import_module('38_unet_selection')",
+        "seed, sel = int(sys.argv[1]), json.loads(s.RESULTS_PATH.read_text())['selection']",
+        "data, decisions = s.splits(), s.pilot_decisions()",
+        "rf = s.train_rf.train_tiles(data['train'], seed=seed, max_samples=decisions['rf_max_samples'], **sel['rf'])",
+        "dice, macro = s.classifier_report.dice_from_counts(s.train_rf.predict_counts_tiles(rf, data['test']).sum(axis=0))",
+        "print(json.dumps({'seed': seed, 'macro_dice': float(macro), 'dice': dict(zip(s.dl.CLASS_NAMES, dice.tolist()))}))",
+    ])
     return (RF_TEST,)
 
 
