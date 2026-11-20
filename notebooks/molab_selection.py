@@ -56,6 +56,8 @@ def _(mo):
     **prueba** times two epochs per tile size and writes nothing to `results.json`.
     **seleccion** runs the real grid. The first selection session pins the commit, the GPU and the PyTorch
     version; later sessions refuse to run if any of them changed (README, Hardware).
+    **test** runs `38 test` once, on the same commit and GPU, and pushes `results.json` and the seed 42
+    checkpoint (the final model) to `molab-state`.
     """)
     return
 
@@ -64,7 +66,7 @@ def _(mo):
 def _(mo):
     drive_url = mo.ui.text(label="Drive link to tiles_used.zip", full_width=True)
     gh_token = mo.ui.text(kind="password", label="GitHub token (contents: write on hugolo27/marta)")
-    mode = mo.ui.dropdown(["prueba", "seleccion"], value="prueba", label="Mode")
+    mode = mo.ui.dropdown(["prueba", "seleccion", "test"], value="prueba", label="Mode")
     start = mo.ui.run_button(label="Run")
     mo.vstack([drive_url, gh_token, mode, start])
     return drive_url, gh_token, mode, start
@@ -173,6 +175,16 @@ def _(STATE_DIR, git, shutil):
 
 
 @app.cell
+def _(REPO, os, subprocess, sys):
+    def run_38(stage):
+        return subprocess.Popen([sys.executable, "scripts/38_unet_selection.py", stage], cwd=REPO, text=True,
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                # molab's Python does not put the script's own folder on the path, so 38 cannot import its siblings
+                                env={**os.environ, "MLFLOW_DISABLE_AGENT_HINT": "1", "PYTHONPATH": str(REPO / "scripts")})
+    return (run_38,)
+
+
+@app.cell
 def _(REPO, commit, importlib, sys):
     sys.path.insert(0, str(REPO / "scripts"))
     selection_script = importlib.import_module("38_unet_selection")
@@ -207,32 +219,23 @@ def _(json, mo, mode, push, selection_script, time, torch_info, unet):
 
 
 @app.cell
-def _(
-    REPO,
-    RESULTS,
-    commit,
-    datetime,
-    json,
-    mo,
-    mode,
-    os,
-    push,
-    sessions,
-    subprocess,
-    sys,
-    threading,
-    time,
-    timezone,
-    torch_info,
-):
+def _(commit, datetime, json, push, sessions, timezone, torch_info):
+    def log_session(stage):
+        info = torch_info()
+        if sessions and {k: sessions[0][k] for k in info} != info:
+            raise SystemExit(f"selection started on {sessions[0]}, this session has {info}: runs are never mixed")
+        sessions.append({**info, "commit": commit, "stage": stage,
+                         "utc": datetime.now(timezone.utc).isoformat(timespec="seconds")})
+        with open("sessions.json", "w") as _f:
+            json.dump(sessions, _f, indent=2)
+        push("sessions.json", "sessions.json")
+    return (log_session,)
+
+
+@app.cell
+def _(RESULTS, log_session, mo, mode, push, run_38, threading, time):
     mo.stop(mode.value != "seleccion")
-    info = torch_info()
-    if sessions and {k: sessions[0][k] for k in info} != info:
-        raise SystemExit(f"selection started on {sessions[0]}, this session has {info}: runs are never mixed")
-    sessions.append({**info, "commit": commit, "utc": datetime.now(timezone.utc).isoformat(timespec="seconds")})
-    with open("sessions.json", "w") as _f:
-        json.dump(sessions, _f, indent=2)
-    push("sessions.json", "sessions.json")
+    log_session("score")
 
     seen = {}
     lock = threading.Lock()
@@ -243,10 +246,7 @@ def _(
                 seen["mtime"] = RESULTS.stat().st_mtime
                 push(RESULTS, "results.json")
 
-    proc = subprocess.Popen([sys.executable, "scripts/38_unet_selection.py", "score"], cwd=REPO, text=True,
-                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                            # molab's Python does not put the script's own folder on the path, so 38 cannot import its siblings
-                            env={**os.environ, "MLFLOW_DISABLE_AGENT_HINT": "1", "PYTHONPATH": str(REPO / "scripts")})
+    proc = run_38("score")
 
     def watch():
         while proc.poll() is None:
@@ -259,6 +259,23 @@ def _(
     proc.wait()
     sync()
     print(f"38 score exited with {proc.returncode}")
+    return
+
+
+@app.cell
+def _(RESULTS, log_session, mo, mode, push, run_38, unet):
+    mo.stop(mode.value != "test")
+    log_session("test")
+    _proc = run_38("test")
+    for _line in _proc.stdout:
+        print(_line, end="", flush=True)
+    _proc.wait()
+    if _proc.returncode:
+        raise RuntimeError(f"38 test exited with {_proc.returncode}, nothing pushed")
+    # molab wipes the disk when the session ends: the seed 42 checkpoint is the final model and exists nowhere else
+    push(unet.CHECKPOINT_PATH, "unet_checkpoint.pt")
+    push(RESULTS, "results.json")
+    print("results.json and unet_checkpoint.pt pushed to molab-state")
     return
 
 
