@@ -1,7 +1,7 @@
 """Explains forest loss in the AOI's change map with Seg-Grad-CAM (phase1-segmentation D6). For a
 few loss cells of the filtered forest/non-forest map (change_map_2019_2023_fnf.npy), the region
 explained is the whole connected loss patch the cell belongs to, and the window is the one of 18's
-classification grid whose center is nearest the cell. Both dates side by side: why the U-Net called
+classification grid whose center is nearest the patch's. Both dates side by side: why the U-Net called
 the patch bosque in 2019 and what it called it in 2023.
 
 The window is pulled from 18's own grid, so it holds the exact pixels 18 classified. Checked per
@@ -64,8 +64,12 @@ def main():
     for i, (row, col) in enumerate(pick_fnf_loss_pixels(change)):
         lon, lat = change_map.pixel_to_wgs84(row, col, meta)
         windows = covering_windows(row, col, grid)
-        r0, c0 = min(windows, key=lambda rc: (rc[0] + size / 2 - 3 * row - 1.5) ** 2 + (rc[1] + size / 2 - 3 * col - 1.5) ** 2)
         patch = patches == patches[row, col]
+        # Centered on the patch, not the picked cell, so the region explained sits inside the window
+        pr, pc = (3 * np.mean(np.nonzero(patch)[k]) + 1.5 for k in (0, 1))
+        step = size // 2
+        r0, c0 = (int(np.clip(round((p - size / 2) / step), 0, (extent - size) // step)) * step
+                  for p, extent in ((pr, grid["height"]), (pc, grid["width"])))
         region = np.kron(patch[r0 // 3:(r0 + size) // 3, c0 // 3:(c0 + size) // 3], np.ones((3, 3)))
         print(f"\ncell {i}: (row={row}, col={col}) -> lon={lon:.5f}, lat={lat:.5f}, loss patch of {int(patch.sum())} cells "
               f"({int(region.sum() / 9)} inside the window)")
@@ -82,7 +86,7 @@ def main():
             print(f"  {period}: recorded {dl.CLASS_NAMES[recorded]}, re-predicted probabilities differ by {diff:.1e} "
                   f"({'matches' if diff < PROBA_TOLERANCE else 'MISMATCH'})")
 
-            window = span[r0 - rmin:r0 - rmin + size, c0 - cmin:c0 - cmin + size]
+            window = dl.tile_to_float(fetch(r0, c0, size, size))
             window_chw = torch.from_numpy(np.ascontiguousarray(window.transpose(2, 0, 1)))
             result = grad_cam.guided_seg_grad_cam(model, window_chw, torch.from_numpy(region).float(), recorded, device)
             out_path = DATA_DIR / f"gradcam_loss_{i}_{period}.png"

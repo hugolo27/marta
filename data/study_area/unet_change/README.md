@@ -74,3 +74,35 @@ before any scoring; since 2026-11-13 no training tile lies within the autocorrel
 (design D2).
 
 ## Results
+
+Run 2026-11-20 on the maps of `18` (seed-42 checkpoint, sha256 eec2fb79...), commit 104a1ed plus the
+reporting fix of the next commit (reference totals restricted to the classified area; selection
+unchanged). Pre-registration hash `36f7ab82...` logged before scoring and checked by `score`.
+
+| Confidence | Persistence | MMU | Dev retention | Dev map loss (ha) | Dev false loss (ha) |
+|---|---|---|---|---|---|
+| none | off | off | 0.956 | 5,525.0 | 26.3 |
+| none | off | on | 0.956 | 5,487.1 | 24.1 |
+| none | on | off | 0.900 | 5,179.6 | 20.8 |
+| none | on | on | 0.900 | 5,140.9 | 19.0 |
+| 0.7 | off | off | 0.920 | 4,974.7 | 6.7 |
+| 0.7 | off | on | 0.919 | 4,953.4 | 6.0 |
+| 0.7 | on | off | 0.881 | 4,759.6 | 6.3 |
+| 0.7 | on | on | 0.880 | 4,737.9 | 5.7 |
+| 0.9 | off | off | 0.704 | 3,592.8 | 0.6 |
+| 0.9 | off | on | 0.702 | 3,564.8 | 0.4 |
+| 0.9 | on | off | 0.684 | 3,489.0 | 0.6 |
+| 0.9 | on | on | 0.681 | 3,455.7 | 0.4 |
+
+Development area: 4,848.9 ha confirmed loss, 9,519.1 ha confirmed stable forest. All 12 pass step 1;
+`m` = 0.4 ha, so step 2 keeps the two configurations at 0.4 ha; step 3 picks the one with fewer
+active steps: **confidence 0.9 + minimum mapping unit**. It keeps 70% of the confirmed loss: the
+strict threshold buys almost no false loss at the cost of omission, which the `discarded_change`
+stratum of the reference sample measures.
+
+AOI with that configuration: 5.1 ha loss (57 cells), 61.6 ha gain, 20,063.6 ha stable forest,
+452.0 ha stable non-forest; Hansen and MapBiomas confirm no loss in the AOI. Seg-Grad-CAM on two loss
+patches (`22`): re-predicting every window over each explained cell gives back the stored
+probabilities within 8.4e-5 in both dates. Reference sample redrawn on this map (`27`, seed 42), before
+any interpretation: 340 points; stratum sizes loss 57, gain 684, discarded change 5,398, buffer 334
+(0.15% of the AOI), stable forest 221,812, stable non-forest 399 cells.

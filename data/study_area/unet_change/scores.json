@@ -1,0 +1,489 @@
+{
+  "preregistration": {
+    "sha256": "36f7ab826efd0c1aeef31809d6849c41c4273529a055df9a1403f19b72724afe",
+    "utc": "2026-11-20T19:09:07.762896+00:00"
+  },
+  "references": {
+    "hansen": "UMD/hansen/global_forest_change_2025_v1_13",
+    "mapbiomas": "projects/mapbiomas-public/assets/chaco/lulc/collection5/mapbiomas_chaco_collection5_integration_v2"
+  },
+  "confirmed_loss_ha": {
+    "aoi": 0.0,
+    "dev": 4848.9
+  },
+  "rows": [
+    {
+      "config": {
+        "confidence": null,
+        "persistence": false,
+        "mmu": false
+      },
+      "aoi": {
+        "map_loss_ha": 76.1,
+        "confirmed_loss_ha": 0.0,
+        "retention": null,
+        "false_loss_ha": 73.3,
+        "loss_not_confirmed_ha": 76.1,
+        "stable_forest_kept": 0.9964,
+        "vs_hansen": {
+          "map_loss_confirmed": 0.0,
+          "hansen_loss_captured": 0.0
+        },
+        "vs_mapbiomas": {
+          "map_loss_confirmed": 0.0,
+          "mapbiomas_loss_captured": 0.0
+        }
+      },
+      "dev": {
+        "map_loss_ha": 5525.0,
+        "confirmed_loss_ha": 4848.9,
+        "retention": 0.9563,
+        "false_loss_ha": 26.3,
+        "loss_not_confirmed_ha": 887.8,
+        "stable_forest_kept": 0.9972,
+        "vs_hansen": {
+          "map_loss_confirmed": 0.8753,
+          "hansen_loss_captured": 0.8757
+        },
+        "vs_mapbiomas": {
+          "map_loss_confirmed": 0.8992,
+          "mapbiomas_loss_captured": 0.8951
+        }
+      }
+    },
+    {
+      "config": {
+        "confidence": null,
+        "persistence": false,
+        "mmu": true
+      },
+      "aoi": {
+        "map_loss_ha": 72.4,
+        "confirmed_loss_ha": 0.0,
+        "retention": null,
+        "false_loss_ha": 71.0,
+        "loss_not_confirmed_ha": 72.4,
+        "stable_forest_kept": 0.9965,
+        "vs_hansen": {
+          "map_loss_confirmed": 0.0,
+          "hansen_loss_captured": 0.0
+        },
+        "vs_mapbiomas": {
+          "map_loss_confirmed": 0.0,
+          "mapbiomas_loss_captured": 0.0
+        }
+      },
+      "dev": {
+        "map_loss_ha": 5487.1,
+        "confirmed_loss_ha": 4848.9,
+        "retention": 0.9563,
+        "false_loss_ha": 24.1,
+        "loss_not_confirmed_ha": 850.2,
+        "stable_forest_kept": 0.9975,
+        "vs_hansen": {
+          "map_loss_confirmed": 0.8811,
+          "hansen_loss_captured": 0.8755
+        },
+        "vs_mapbiomas": {
+          "map_loss_confirmed": 0.9036,
+          "mapbiomas_loss_captured": 0.8934
+        }
+      }
+    },
+    {
+      "config": {
+        "confidence": null,
+        "persistence": true,
+        "mmu": false
+      },
+      "aoi": {
+        "map_loss_ha": 20.3,
+        "confirmed_loss_ha": 0.0,
+        "retention": null,
+        "false_loss_ha": 19.0,
+        "loss_not_confirmed_ha": 20.3,
+        "stable_forest_kept": 0.9991,
+        "vs_hansen": {
+          "map_loss_confirmed": 0.0,
+          "hansen_loss_captured": 0.0
+        },
+        "vs_mapbiomas": {
+          "map_loss_confirmed": 0.0,
+          "mapbiomas_loss_captured": 0.0
+        }
+      },
+      "dev": {
+        "map_loss_ha": 5179.6,
+        "confirmed_loss_ha": 4848.9,
+        "retention": 0.9003,
+        "false_loss_ha": 20.8,
+        "loss_not_confirmed_ha": 814.0,
+        "stable_forest_kept": 0.9978,
+        "vs_hansen": {
+          "map_loss_confirmed": 0.8732,
+          "hansen_loss_captured": 0.819
+        },
+        "vs_mapbiomas": {
+          "map_loss_confirmed": 0.9034,
+          "mapbiomas_loss_captured": 0.8431
+        }
+      }
+    },
+    {
+      "config": {
+        "confidence": null,
+        "persistence": true,
+        "mmu": true
+      },
+      "aoi": {
+        "map_loss_ha": 16.1,
+        "confirmed_loss_ha": 0.0,
+        "retention": null,
+        "false_loss_ha": 16.1,
+        "loss_not_confirmed_ha": 16.1,
+        "stable_forest_kept": 0.9992,
+        "vs_hansen": {
+          "map_loss_confirmed": 0.0,
+          "hansen_loss_captured": 0.0
+        },
+        "vs_mapbiomas": {
+          "map_loss_confirmed": 0.0,
+          "mapbiomas_loss_captured": 0.0
+        }
+      },
+      "dev": {
+        "map_loss_ha": 5140.9,
+        "confirmed_loss_ha": 4848.9,
+        "retention": 0.8999,
+        "false_loss_ha": 19.0,
+        "loss_not_confirmed_ha": 777.1,
+        "stable_forest_kept": 0.998,
+        "vs_hansen": {
+          "map_loss_confirmed": 0.8793,
+          "hansen_loss_captured": 0.8186
+        },
+        "vs_mapbiomas": {
+          "map_loss_confirmed": 0.9082,
+          "mapbiomas_loss_captured": 0.8412
+        }
+      }
+    },
+    {
+      "config": {
+        "confidence": 0.7,
+        "persistence": false,
+        "mmu": false
+      },
+      "aoi": {
+        "map_loss_ha": 35.6,
+        "confirmed_loss_ha": 0.0,
+        "retention": null,
+        "false_loss_ha": 35.6,
+        "loss_not_confirmed_ha": 35.6,
+        "stable_forest_kept": 0.9982,
+        "vs_hansen": {
+          "map_loss_confirmed": 0.0,
+          "hansen_loss_captured": 0.0
+        },
+        "vs_mapbiomas": {
+          "map_loss_confirmed": 0.0,
+          "mapbiomas_loss_captured": 0.0
+        }
+      },
+      "dev": {
+        "map_loss_ha": 4974.7,
+        "confirmed_loss_ha": 4848.9,
+        "retention": 0.9196,
+        "false_loss_ha": 6.7,
+        "loss_not_confirmed_ha": 515.6,
+        "stable_forest_kept": 0.9993,
+        "vs_hansen": {
+          "map_loss_confirmed": 0.925,
+          "hansen_loss_captured": 0.8333
+        },
+        "vs_mapbiomas": {
+          "map_loss_confirmed": 0.942,
+          "mapbiomas_loss_captured": 0.8443
+        }
+      }
+    },
+    {
+      "config": {
+        "confidence": 0.7,
+        "persistence": false,
+        "mmu": true
+      },
+      "aoi": {
+        "map_loss_ha": 33.9,
+        "confirmed_loss_ha": 0.0,
+        "retention": null,
+        "false_loss_ha": 33.9,
+        "loss_not_confirmed_ha": 33.9,
+        "stable_forest_kept": 0.9983,
+        "vs_hansen": {
+          "map_loss_confirmed": 0.0,
+          "hansen_loss_captured": 0.0
+        },
+        "vs_mapbiomas": {
+          "map_loss_confirmed": 0.0,
+          "mapbiomas_loss_captured": 0.0
+        }
+      },
+      "dev": {
+        "map_loss_ha": 4953.4,
+        "confirmed_loss_ha": 4848.9,
+        "retention": 0.9193,
+        "false_loss_ha": 6.0,
+        "loss_not_confirmed_ha": 495.9,
+        "stable_forest_kept": 0.9994,
+        "vs_hansen": {
+          "map_loss_confirmed": 0.9287,
+          "hansen_loss_captured": 0.833
+        },
+        "vs_mapbiomas": {
+          "map_loss_confirmed": 0.9443,
+          "mapbiomas_loss_captured": 0.8428
+        }
+      }
+    },
+    {
+      "config": {
+        "confidence": 0.7,
+        "persistence": true,
+        "mmu": false
+      },
+      "aoi": {
+        "map_loss_ha": 13.0,
+        "confirmed_loss_ha": 0.0,
+        "retention": null,
+        "false_loss_ha": 13.0,
+        "loss_not_confirmed_ha": 13.0,
+        "stable_forest_kept": 0.9994,
+        "vs_hansen": {
+          "map_loss_confirmed": 0.0,
+          "hansen_loss_captured": 0.0
+        },
+        "vs_mapbiomas": {
+          "map_loss_confirmed": 0.0,
+          "mapbiomas_loss_captured": 0.0
+        }
+      },
+      "dev": {
+        "map_loss_ha": 4759.6,
+        "confirmed_loss_ha": 4848.9,
+        "retention": 0.8805,
+        "false_loss_ha": 6.3,
+        "loss_not_confirmed_ha": 489.9,
+        "stable_forest_kept": 0.9993,
+        "vs_hansen": {
+          "map_loss_confirmed": 0.9236,
+          "hansen_loss_captured": 0.7961
+        },
+        "vs_mapbiomas": {
+          "map_loss_confirmed": 0.9433,
+          "mapbiomas_loss_captured": 0.809
+        }
+      }
+    },
+    {
+      "config": {
+        "confidence": 0.7,
+        "persistence": true,
+        "mmu": true
+      },
+      "aoi": {
+        "map_loss_ha": 11.6,
+        "confirmed_loss_ha": 0.0,
+        "retention": null,
+        "false_loss_ha": 11.6,
+        "loss_not_confirmed_ha": 11.6,
+        "stable_forest_kept": 0.9994,
+        "vs_hansen": {
+          "map_loss_confirmed": 0.0,
+          "hansen_loss_captured": 0.0
+        },
+        "vs_mapbiomas": {
+          "map_loss_confirmed": 0.0,
+          "mapbiomas_loss_captured": 0.0
+        }
+      },
+      "dev": {
+        "map_loss_ha": 4737.9,
+        "confirmed_loss_ha": 4848.9,
+        "retention": 0.8801,
+        "false_loss_ha": 5.7,
+        "loss_not_confirmed_ha": 470.5,
+        "stable_forest_kept": 0.9994,
+        "vs_hansen": {
+          "map_loss_confirmed": 0.9274,
+          "hansen_loss_captured": 0.7956
+        },
+        "vs_mapbiomas": {
+          "map_loss_confirmed": 0.9458,
+          "mapbiomas_loss_captured": 0.8074
+        }
+      }
+    },
+    {
+      "config": {
+        "confidence": 0.9,
+        "persistence": false,
+        "mmu": false
+      },
+      "aoi": {
+        "map_loss_ha": 6.0,
+        "confirmed_loss_ha": 0.0,
+        "retention": null,
+        "false_loss_ha": 6.0,
+        "loss_not_confirmed_ha": 6.0,
+        "stable_forest_kept": 0.9997,
+        "vs_hansen": {
+          "map_loss_confirmed": 0.0,
+          "hansen_loss_captured": 0.0
+        },
+        "vs_mapbiomas": {
+          "map_loss_confirmed": 0.0,
+          "mapbiomas_loss_captured": 0.0
+        }
+      },
+      "dev": {
+        "map_loss_ha": 3592.8,
+        "confirmed_loss_ha": 4848.9,
+        "retention": 0.704,
+        "false_loss_ha": 0.6,
+        "loss_not_confirmed_ha": 179.1,
+        "stable_forest_kept": 0.9999,
+        "vs_hansen": {
+          "map_loss_confirmed": 0.9732,
+          "hansen_loss_captured": 0.6332
+        },
+        "vs_mapbiomas": {
+          "map_loss_confirmed": 0.9714,
+          "mapbiomas_loss_captured": 0.6289
+        }
+      }
+    },
+    {
+      "config": {
+        "confidence": 0.9,
+        "persistence": false,
+        "mmu": true
+      },
+      "aoi": {
+        "map_loss_ha": 5.1,
+        "confirmed_loss_ha": 0.0,
+        "retention": null,
+        "false_loss_ha": 5.1,
+        "loss_not_confirmed_ha": 5.1,
+        "stable_forest_kept": 0.9997,
+        "vs_hansen": {
+          "map_loss_confirmed": 0.0,
+          "hansen_loss_captured": 0.0
+        },
+        "vs_mapbiomas": {
+          "map_loss_confirmed": 0.0,
+          "mapbiomas_loss_captured": 0.0
+        }
+      },
+      "dev": {
+        "map_loss_ha": 3564.8,
+        "confirmed_loss_ha": 4848.9,
+        "retention": 0.7016,
+        "false_loss_ha": 0.4,
+        "loss_not_confirmed_ha": 162.7,
+        "stable_forest_kept": 1.0,
+        "vs_hansen": {
+          "map_loss_confirmed": 0.9774,
+          "hansen_loss_captured": 0.6309
+        },
+        "vs_mapbiomas": {
+          "map_loss_confirmed": 0.973,
+          "mapbiomas_loss_captured": 0.625
+        }
+      }
+    },
+    {
+      "config": {
+        "confidence": 0.9,
+        "persistence": true,
+        "mmu": false
+      },
+      "aoi": {
+        "map_loss_ha": 4.0,
+        "confirmed_loss_ha": 0.0,
+        "retention": null,
+        "false_loss_ha": 4.0,
+        "loss_not_confirmed_ha": 4.0,
+        "stable_forest_kept": 0.9998,
+        "vs_hansen": {
+          "map_loss_confirmed": 0.0,
+          "hansen_loss_captured": 0.0
+        },
+        "vs_mapbiomas": {
+          "map_loss_confirmed": 0.0,
+          "mapbiomas_loss_captured": 0.0
+        }
+      },
+      "dev": {
+        "map_loss_ha": 3489.0,
+        "confirmed_loss_ha": 4848.9,
+        "retention": 0.6844,
+        "false_loss_ha": 0.6,
+        "loss_not_confirmed_ha": 170.3,
+        "stable_forest_kept": 0.9999,
+        "vs_hansen": {
+          "map_loss_confirmed": 0.973,
+          "hansen_loss_captured": 0.6148
+        },
+        "vs_mapbiomas": {
+          "map_loss_confirmed": 0.9727,
+          "mapbiomas_loss_captured": 0.6115
+        }
+      }
+    },
+    {
+      "config": {
+        "confidence": 0.9,
+        "persistence": true,
+        "mmu": true
+      },
+      "aoi": {
+        "map_loss_ha": 3.5,
+        "confirmed_loss_ha": 0.0,
+        "retention": null,
+        "false_loss_ha": 3.5,
+        "loss_not_confirmed_ha": 3.5,
+        "stable_forest_kept": 0.9998,
+        "vs_hansen": {
+          "map_loss_confirmed": 0.0,
+          "hansen_loss_captured": 0.0
+        },
+        "vs_mapbiomas": {
+          "map_loss_confirmed": 0.0,
+          "mapbiomas_loss_captured": 0.0
+        }
+      },
+      "dev": {
+        "map_loss_ha": 3455.7,
+        "confirmed_loss_ha": 4848.9,
+        "retention": 0.6811,
+        "false_loss_ha": 0.4,
+        "loss_not_confirmed_ha": 152.9,
+        "stable_forest_kept": 1.0,
+        "vs_hansen": {
+          "map_loss_confirmed": 0.9775,
+          "hansen_loss_captured": 0.6117
+        },
+        "vs_mapbiomas": {
+          "map_loss_confirmed": 0.9746,
+          "mapbiomas_loss_captured": 0.6068
+        }
+      }
+    }
+  ],
+  "selected": {
+    "confidence": 0.9,
+    "persistence": false,
+    "mmu": true
+  }
+}

@@ -1,29 +1,29 @@
 {
   "config": {
     "confidence": 0.9,
-    "persistence": true,
+    "persistence": false,
     "mmu": true
   },
   "stats": {
     "unclassified": {
-      "pixels": 1298551,
-      "ha": 12985.5
+      "pixels": 28396,
+      "ha": 2555.6
     },
     "stable_forest": {
-      "pixels": 1885889,
-      "ha": 18858.9
+      "pixels": 222929,
+      "ha": 20063.6
     },
     "stable_nonforest": {
-      "pixels": 168653,
-      "ha": 1686.5
+      "pixels": 5022,
+      "ha": 452.0
     },
     "loss": {
-      "pixels": 811,
-      "ha": 8.1
+      "pixels": 57,
+      "ha": 5.1
     },
     "gain": {
-      "pixels": 6096,
-      "ha": 61.0
+      "pixels": 684,
+      "ha": 61.6
     }
   }
 }

@@ -151,7 +151,8 @@ def score():
     for name in ("aoi", "dev"):
         meta, rasters, probas = load_area(name)
         print(f"pulling references for {name}...")
-        refs[name] = references(meta)
+        # Only cells the map classified: the grid's padding outside the area is not part of it
+        refs[name] = {k: v & (rasters["2019"] != change_map.UNCLASSIFIED) for k, v in references(meta).items()}
         data[name] = (rasters, probas)
         print(f"  confirmed loss: {refs[name]['confirmed_loss'].sum() * CELL_HA:,.1f} ha, "
               f"confirmed stable forest: {refs[name]['confirmed_stable_forest'].sum() * CELL_HA:,.1f} ha")
