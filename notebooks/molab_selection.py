@@ -178,10 +178,10 @@ def _(STATE_DIR, git, shutil):
 
 @app.cell
 def _(REPO, os, subprocess, sys):
-    def run_py(*args):
+    def run_py(*args, **env):
         return subprocess.Popen([sys.executable, *args], cwd=REPO, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 # molab's Python does not put the script's own folder on the path, so 38 cannot import its siblings
-                                env={**os.environ, "MLFLOW_DISABLE_AGENT_HINT": "1", "PYTHONPATH": str(REPO / "scripts")})
+                                env={**os.environ, "MLFLOW_DISABLE_AGENT_HINT": "1", "PYTHONPATH": str(REPO / "scripts"), **env})
     return (run_py,)
 
 
@@ -282,7 +282,7 @@ def _():
 
 
 @app.cell
-def _(RESULTS, RF_TEST, STATE_DIR, json, log_session, mo, mode, push, run_py, selection_script, unet):
+def _(Path, RESULTS, RF_TEST, STATE_DIR, json, log_session, mo, mode, os, push, run_py, selection_script, time, unet):
     mo.stop(mode.value != "test")
     _s = selection_script
     _s.check_preregistration()
@@ -321,20 +321,33 @@ def _(RESULTS, RF_TEST, STATE_DIR, json, log_session, mo, mode, push, run_py, se
         _dice, _macro = _s.classifier_report.dice_from_counts(unet.predict_counts_full(_model, _data["test"], _device).sum(axis=0))
         _record("unet", {"seed": _seed, "macro_dice": float(_macro), "dice": dict(zip(_s.dl.CLASS_NAMES, _dice.tolist()))})
 
+    def _memory():
+        # The container's own limit; /proc/meminfo would show the whole host
+        cg = Path("/sys/fs/cgroup")
+        try:
+            used, limit = int((cg / "memory.current").read_text()), (cg / "memory.max").read_text().strip()
+        except (FileNotFoundError, ValueError):
+            return "memory: no cgroup info"
+        return f"memory: {used / 1e9:.1f} GB used, limit {int(limit) / 1e9:.1f} GB" if limit.isdigit() else f"memory: {used / 1e9:.1f} GB used, no limit"
+
     # The U-Nets leave every tile they read cached in the kernel (about 7 GB): freed so the Random Forest process fits
     _s.dl._load_full_tile.cache_clear()
+    print(f"{os.cpu_count()} cores, {_memory()}", flush=True)
     for _seed in _s.selection.SEEDS:
         if str(_seed) in _runs["rf"]:
             continue
         print(f"seed {_seed}: training Random Forest {_sel['rf']}", flush=True)
-        _proc = run_py("-c", RF_TEST, str(_seed))
-        _lines = []
-        for _line in _proc.stdout:
-            print(_line, end="", flush=True)
-            _lines.append(_line)
-        if _proc.wait():
+        # n_jobs=-1 starts one tree builder per core, each with its own arrays over every training cell: on molab's
+        # many cores that fills the container. Eight threads build the same trees, since each tree has its own seed
+        _proc = run_py("-c", RF_TEST, str(_seed), LOKY_MAX_CPU_COUNT="8")
+        while _proc.poll() is None:
+            print(f"  {_memory()}", flush=True)
+            time.sleep(30)
+        _out = _proc.stdout.read()
+        print(_out, end="", flush=True)
+        if _proc.returncode:
             raise RuntimeError(f"Random Forest seed {_seed} exited with {_proc.returncode}")
-        _record("rf", json.loads(_lines[-1]))
+        _record("rf", json.loads(_out.strip().splitlines()[-1]))
 
     _results["test"] = {m: [_runs[m][str(seed)] for seed in _s.selection.SEEDS] for m in ("unet", "rf")}
     _s.save(_results)
