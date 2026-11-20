@@ -97,5 +97,13 @@
     "commit": "0726a48c3d7d328248dd419ce6175095c50309a9",
     "stage": "test",
     "utc": "2026-11-20T14:05:35+00:00"
+  },
+  {
+    "device": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+    "torch": "2.11.0+cu130",
+    "cuda": "13.0",
+    "commit": "0726a48c3d7d328248dd419ce6175095c50309a9",
+    "stage": "test",
+    "utc": "2026-11-20T14:42:40+00:00"
   }
 ]
