@@ -319,6 +319,8 @@ def _(RESULTS, RF_TEST, STATE_DIR, json, log_session, mo, mode, push, run_py, se
         _dice, _macro = _s.classifier_report.dice_from_counts(unet.predict_counts_full(_model, _data["test"], _device).sum(axis=0))
         _record("unet", {"seed": _seed, "macro_dice": float(_macro), "dice": dict(zip(_s.dl.CLASS_NAMES, _dice.tolist()))})
 
+    # The U-Nets leave every tile they read cached in the kernel (about 7 GB): freed so the Random Forest process fits
+    _s.dl._load_full_tile.cache_clear()
     for _seed in _s.selection.SEEDS:
         if str(_seed) in _runs["rf"]:
             continue
