@@ -1605,6 +1605,11 @@
       "score": 0.8248755953614312,
       "best_epoch": 94,
       "stop_epoch": 110
+    },
+    "unet_{'tile_px': 48, 'lr': 0.001, 'batch_size': 64}_cap300_seed2026": {
+      "score": 0.8300115858368603,
+      "best_epoch": 127,
+      "stop_epoch": 143
     }
   },
   "unet": [
@@ -2475,6 +2480,67 @@
         73,
         95
       ]
+    },
+    {
+      "config": {
+        "tile_px": 48,
+        "lr": 0.001,
+        "batch_size": 64
+      },
+      "scores": [
+        0.8281503731825408,
+        0.808489272641764,
+        0.8262014740193443,
+        0.8248755953614312,
+        0.8300115858368603
+      ],
+      "mean": 0.8235456602083883,
+      "std": 0.008638988032076203,
+      "max_epochs": 300,
+      "best_epoch": [
+        74,
+        26,
+        64,
+        94,
+        127
+      ],
+      "stop_epoch": [
+        90,
+        42,
+        80,
+        110,
+        143
+      ]
     }
-  ]
+  ],
+  "selection": {
+    "unet": {
+      "tile_px": 48,
+      "lr": 0.001,
+      "batch_size": 32
+    },
+    "rf": {
+      "n_estimators": 500,
+      "max_depth": null,
+      "max_features": 0.5
+    },
+    "unet_mean": 0.8277069827301607,
+    "rf_mean": 0.814479548259435,
+    "unet_max_epochs": 300,
+    "unet_minus_rf": 0.013227434470725719,
+    "pooled_std": 0.0016709830028163995,
+    "unet_better": true,
+    "edges_run": [
+      {
+        "tile_px": 48,
+        "lr": 0.003,
+        "batch_size": 32
+      },
+      {
+        "tile_px": 48,
+        "lr": 0.001,
+        "batch_size": 64
+      }
+    ]
+  }
 }
