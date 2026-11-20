@@ -56,8 +56,9 @@ def _(mo):
     **prueba** times two epochs per tile size and writes nothing to `results.json`.
     **seleccion** runs the real grid. The first selection session pins the commit, the GPU and the PyTorch
     version; later sessions refuse to run if any of them changed (README, Hardware).
-    **test** runs `38 test` once, on the same commit and GPU, and pushes `results.json` and the seed 42
-    checkpoint (the final model) to `molab-state`.
+    **test** runs the loop of `38 test` once, on the same commit and GPU. Each seed is pushed to
+    `test_runs.json` as it ends, so a reclaimed sandbox resumes at the next run; the seed 42 checkpoint
+    (the final model) and the final `results.json` also go to `molab-state`.
     """)
     return
 
@@ -263,19 +264,52 @@ def _(RESULTS, log_session, mo, mode, push, run_38, threading, time):
 
 
 @app.cell
-def _(RESULTS, log_session, mo, mode, push, run_38, unet):
+def _(RESULTS, STATE_DIR, json, log_session, mo, mode, push, selection_script, unet):
     mo.stop(mode.value != "test")
+    _s = selection_script
+    _s.check_preregistration()
+    _results = json.loads(RESULTS.read_text())
+    if "test" in _results:
+        raise SystemExit("test already run once")
+    _s.check_hardware(_results)
     log_session("test")
-    _proc = run_38("test")
-    for _line in _proc.stdout:
-        print(_line, end="", flush=True)
-    _proc.wait()
-    if _proc.returncode:
-        raise RuntimeError(f"38 test exited with {_proc.returncode}, nothing pushed")
-    # molab wipes the disk when the session ends: the seed 42 checkpoint is the final model and exists nowhere else
-    push(unet.CHECKPOINT_PATH, "unet_checkpoint.pt")
+    _data, _decisions, _sel = _s.splits(), _s.pilot_decisions(), _results["selection"]
+    # Same loop as 38 test, but each seed is pushed as it ends: a reclaimed sandbox loses one run, not ten
+    try:
+        _runs = json.loads((STATE_DIR / "test_runs.json").read_text())
+    except FileNotFoundError:
+        _runs = {"unet": {}, "rf": {}}
+
+    def _record(model, seed, counts):
+        dice, macro = _s.classifier_report.dice_from_counts(counts.sum(axis=0))
+        _runs[model][str(seed)] = {"seed": seed, "macro_dice": float(macro), "dice": dict(zip(_s.dl.CLASS_NAMES, dice.tolist()))}
+        with open("test_runs.json", "w") as f:
+            json.dump(_runs, f, indent=2)
+        push("test_runs.json", "test_runs.json")
+        print(f"seed {seed}: {model} test macro Dice {macro:.4f}, pushed", flush=True)
+
+    for _seed in _s.selection.SEEDS:
+        if str(_seed) not in _runs["unet"]:
+            print(f"seed {_seed}: training U-Net {_sel['unet']}", flush=True)
+            _model, _device, _ = unet.train(_data["train"], _data["val"], seed=_seed, max_epochs=_sel["unet_max_epochs"],
+                                            patience=_decisions["patience"] or _decisions["max_epochs"], verbose=True,
+                                            random_window=True, **_sel["unet"])
+            if _seed == 42:
+                # Before the score: once seed 42 is recorded it is never retrained, so its checkpoint must already be up
+                unet.save_checkpoint(_model, _seed)
+                push(unet.CHECKPOINT_PATH, "unet_checkpoint.pt")
+            _record("unet", _seed, unet.predict_counts_full(_model, _data["test"], _device))
+        if str(_seed) not in _runs["rf"]:
+            print(f"seed {_seed}: training Random Forest {_sel['rf']}", flush=True)
+            _rf = _s.train_rf.train_tiles(_data["train"], seed=_seed, max_samples=_decisions["rf_max_samples"], **_sel["rf"])
+            _record("rf", _seed, _s.train_rf.predict_counts_tiles(_rf, _data["test"]))
+
+    _results["test"] = {m: [_runs[m][str(seed)] for seed in _s.selection.SEEDS] for m in ("unet", "rf")}
+    _s.save(_results)
     push(RESULTS, "results.json")
-    print("results.json and unet_checkpoint.pt pushed to molab-state")
+    for _name, _r in _results["test"].items():
+        _macro = [r["macro_dice"] for r in _r]
+        print(f"{_name}: test macro Dice {_s.np.mean(_macro):.4f} +/- {_s.np.std(_macro, ddof=1):.4f}")
     return
 
 
