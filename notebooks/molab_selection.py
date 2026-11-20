@@ -270,6 +270,8 @@ def _():
     RF_TEST = "\n".join([
         "import importlib, json, sys",
         "s = importlib.import_module('38_unet_selection')",
+        # Each tile is read once here, so the cache only holds about 6 GB of tiles while the forest is built
+        "s.dl._load_full_tile = s.dl._load_full_tile.__wrapped__",
         "seed, sel = int(sys.argv[1]), json.loads(s.RESULTS_PATH.read_text())['selection']",
         "data, decisions = s.splits(), s.pilot_decisions()",
         "rf = s.train_rf.train_tiles(data['train'], seed=seed, max_samples=decisions['rf_max_samples'], **sel['rf'])",
