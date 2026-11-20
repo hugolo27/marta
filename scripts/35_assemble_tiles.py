@@ -169,10 +169,14 @@ def extract(p):
     wet_gap = float(np.all(image[..., n:] == 0, axis=-1).mean())
     label[gap.reshape(LABEL_PX, 3, LABEL_PX, 3).any(axis=(1, 3))] = 0
 
-    ndvi = [channels.index("NDVI"), channels.index("NDVI_wet")]
-    image[..., ndvi] *= NDVI_SCALE
-    image = np.clip(np.rint(image), -32768, 32767).astype(np.int16)
-    return image, label, {"epsg": epsg, "x0": x0, "y0": y0, "dry_gap": round(dry_gap, 4), "wet_gap": round(wet_gap, 4)}
+    return quantize(image, channels), label, {"epsg": epsg, "x0": x0, "y0": y0, "dry_gap": round(dry_gap, 4), "wet_gap": round(wet_gap, 4)}
+
+
+def quantize(image, channels):
+    """int16 as stored in the tiles: bands as delivered, NDVI x NDVI_SCALE."""
+    image = image.copy()
+    image[..., [channels.index("NDVI"), channels.index("NDVI_wet")]] *= NDVI_SCALE
+    return np.clip(np.rint(image), -32768, 32767).astype(np.int16)
 
 
 def process(item):
