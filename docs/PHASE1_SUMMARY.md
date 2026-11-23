@@ -202,6 +202,35 @@ improving.
 
 ## Results
 
+### Current result: U-Net vs. Random Forest (November 2026)
+
+At the tutor's request the 3×3 CNN was replaced by a segmenting U-Net, scored with Dice at 30 m
+(change `phase1-segmentation`). Every rule was logged to MLflow before scoring.
+
+| Context | U-Net | Random Forest | Result |
+|---|---|---|---|
+| Validation | 0.8277 ± 0.0024 | 0.8145 ± 0.0002 | U-Net better |
+| Test (once) | 0.8159 ± 0.0104 | 0.8113 ± 0.0002 | Tie |
+| Filadelfia (held out) | 0.830 ± 0.008 | 0.810 ± 0.000 | U-Net better |
+| Bahía Negra (held out) | 0.615 ± 0.006 | 0.588 ± 0.000 | U-Net better |
+| Pozo Colorado (held out) | 0.605 ± 0.017 | 0.606 ± 0.001 | Tie |
+
+- Macro Dice, 5 seeds per model (a convention: Henderson et al., 2018, support several seeds and
+  warn 5 may not suffice). A model wins when it leads by more than the pooled standard deviation.
+- The tie on test makes the U-Net the operational classifier, since only it supports
+  per-prediction explanations (Seg-Grad-CAM).
+- The four seeds retrained for the held-out regions did not reproduce their test runs exactly (GPU
+  training is not deterministic); seed 2026 went from 0.7992 to 0.8246. The test is not replaced.
+  See [`unet_selection/README.md`](../data/study_area/unet_selection/README.md).
+- The low macro Dice in Bahía Negra and Pozo Colorado comes from cultivo, nearly absent from
+  MapBiomas there (4 and 3,895 cells of over 3 million); bosque Dice is 0.99 and 0.97.
+- AOI change map with the filter picked by the pre-registered rule (confidence 0.9 + 0.5 ha
+  minimum mapping unit; keeps 70% of the development area's confirmed loss with 0.4 ha of false
+  loss): 5.1 ha loss, 61.6 ha gain 2019-2023; a 340-point reference sample drawn on it. See
+  [`unet_change/README.md`](../data/study_area/unet_change/README.md).
+
+The subsections below are the earlier 3×3 CNN results, kept as background.
+
 ### On the AOI test split
 
 **Random Forest 0.841 F1 macro (±0.003), CNN 0.865 (±0.003)**, a +0.024 difference,
@@ -239,9 +268,9 @@ at the center pixel, has no such failure mode. With the 3×3 input (90 m) the ga
 from 0.125 to 0.015, consistent with that diagnosis; the failure has not been re-analyzed
 point by point with the new model.
 
-### Decision: CNN as the operational classifier
+### Decision at the time: CNN as the operational classifier (superseded by the U-Net)
 
-Confirmed as the classifier that Grad-CAM, the temporal comparison, and carbon
+At the time, confirmed as the classifier that Grad-CAM, the temporal comparison, and carbon
 estimation are built on. It wins in 3 of the 4 evaluated contexts (AOI, Bahía
 Negra, Pozo Colorado) and loses only in Filadelfia, with a specific, understood cause —
 not an unexplained generalization gap. Acceptable because the actual deployment target
@@ -336,7 +365,8 @@ started. See
 
 ## Current status and what's next
 
-**Phase 1 is complete**: study area, dataset, CNN/RF classifier, temporal comparison,
-Grad-CAM — all archived above. **Not started**: Phase 2 (carbon estimation — canopy
+**Phase 1**: study area, dataset, U-Net/RF classifier, temporal comparison and Seg-Grad-CAM are
+done; what remains is the blind interpretation of the 640 reference points and the error-adjusted
+loss area. **Not started**: Phase 2 (carbon estimation — canopy
 height inference, GEDI L4A calibration, IPCC conversion to CO2e), Phase 3 (validation),
 Phase 4 (audit demo against Corazón Verde del Chaco).

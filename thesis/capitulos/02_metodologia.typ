@@ -89,7 +89,7 @@ seca) se mantiene salvo que otra la supere por más de la desviación estándar 
 test se evalúa una sola vez, con lo ya elegido; el detalle está en los resultados de
 Fase 1. En todo el trabajo, la dispersión entre semillas se reporta como desvío muestral.
 
-== Segmentación con U-Net (en curso)
+== Segmentación con U-Net
 
 Con la entrada de 3×3, la CNN tenía 100.707 pesos para 234 números de entrada, un modelo
 demasiado grande para lo que ve. Por indicación del tutor, el clasificador con contexto pasa a
@@ -133,7 +133,7 @@ una razón geométrica.
   [Aumento de datos], [giros de 90° y espejos], [@isensee2021nnunet],
   [Paciencia, tamaños de validación y test, cantidad de recortes], [medidos en un estudio piloto], [@prechelt1998early @xu2018splitting @ning2020training],
   [Regla de borde], [si gana un extremo de la grilla, se prueba un paso más (×3 en `lr`, ×2 en lote)], [@godbole2023tuning; el tamaño del paso es convención],
-  [Semillas y regla], [5 semillas; gana si supera por más que el desvío combinado], [@henderson2018deep; equivale a una _d_ de Cohen mayor que 1 @cohen2013statistical],
+  [Semillas y regla], [5 semillas; gana si supera por más que el desvío combinado], [Varias semillas por @henderson2018deep, que advierte que 5 puede no alcanzar: el 5 es convención; la regla equivale a una _d_ de Cohen mayor que 1 @cohen2013statistical],
   [Explicaciones], [Grad-CAM para segmentación], [@vinogradova2020segcam],
 )
 
@@ -210,6 +210,31 @@ mismo resultado en otra plataforma @pytorchreproducibility, así que toda la sel
 corren en un mismo modelo de GPU, el script se detiene si encuentra otro y, si ese modelo deja de
 estar disponible, la selección se repite entera en el nuevo.
 
+*Repetir una semilla no repite el modelo.* Aun en la misma GPU, con la misma semilla y el mismo
+código, entrenar en GPU no da un resultado idéntico bit a bit @pytorchreproducibility: las
+corridas se separan y el corte temprano las termina en épocas distintas. La regla de hardware
+quita las diferencias entre plataformas, no esta variación. Por eso el test se corre una sola
+vez y no se repite, y las semillas reentrenadas para las regiones reservadas se tratan como
+corridas nuevas de la misma configuración.
+
+*Clasificación de zonas enteras.* Para el AOI, el área de desarrollo y las regiones reservadas
+la imagen se arma en la misma grilla UTM de 10 m de los recortes, con bordes en múltiplos de
+30 m y partida en el límite de zona UTM cuando la zona lo cruza. La U-Net recorre la grilla con
+ventanas de su tamaño que se solapan a la mitad y promedia las probabilidades de 30 m de cada
+celda, la misma regla con que se predice un recorte entero; la grilla lleva un margen de media
+ventana, así que toda celda queda bajo cuatro ventanas. El Random Forest clasifica el promedio
+de cada bloque de 3×3. Se verificó en recortes sintéticos que el resultado coincide con la
+predicción directa (diferencia máxima 1,1·10#super[-6]) y no depende de en cuántos pedazos se
+descarga la imagen, y que dos recortes de entrenamiento descargados por esta vía son idénticos
+a los guardados. Una celda con un hueco de imagen en cualquiera de los dos compuestos queda sin
+clasificar.
+
+*Regiones reservadas.* Cada región se clasifica entera, en 2019 y 2023, con las 5 semillas de
+cada modelo, y se mide el Dice macro contra MapBiomas sobre todas sus celdas con etiqueta, sin
+sorteo. La regla para declarar un ganador es la del test. Como control aparte se informa el
+acuerdo con ESA WorldCover 2021; su clase de pastizal no separa pastura manejada, así que para
+pasto es un control débil.
+
 == Detección de cambio y evaluación de exactitud
 
 *Cambio bosque/no bosque con post-proceso pre-registrado.* El primer mapa de cambio del AOI
@@ -221,9 +246,20 @@ configuraciones, la que menos pérdida falsa deja en el AOI sin perder más de l
 pérdida confirmada en un área de desarrollo con deforestación real. Con la CNN final
 quedó elegida confianza ≥ 0,9 en ambas fechas, persistencia en 2022 y unidad mínima de
 mapeo: pérdida mapeada de 8,1 ha. (Con CNN anteriores, la misma regla había dejado 81,9 ha
-y 7,6 ha.) Para la U-Net la regla cambia en un punto: la pérdida falsa se mide en el bosque
+y 7,6 ha.) Para la U-Net la regla cambia en dos puntos: la pérdida falsa se mide en el bosque
 estable confirmado del área de desarrollo y no en el AOI, para que el AOI, donde se evalúa la
-exactitud, no intervenga en la elección del filtro. La regla nueva se registra antes de puntuar.
+exactitud, no intervenga en la elección del filtro; y la unidad mínima de mapeo se expresa en
+celdas de 30 m (0,5 ha son 5,6 celdas de 0,09 ha; se redondea a 6 para que ninguna mancha
+conservada quede por debajo de 0,5 ha). La regla nueva quedó registrada con su huella
+SHA-256 antes de puntuar la primera configuración.
+
+*Explicaciones con Seg-Grad-CAM.* En segmentación no hay una etiqueta por recorte que explicar,
+así que se explica la suma del puntaje de una clase sobre una región del mapa, por ejemplo una
+mancha de pérdida entera @vinogradova2020segcam. El mapa de calor sale del cuello de botella de
+la U-Net (6×6 en una ventana de 48 px) y se afina a 10 m con retropropagación guiada. Se verificó
+que depende de la clase explicada: sobre la misma región, la clase predicha y otra clase dan
+mapas distintos (diferencia media 0,33). El Random Forest no tiene gradientes ni mapas de
+activación, así que no admite esta explicación.
 
 *Evaluación contra referencia independiente.* La exactitud medida hasta ahí es acuerdo con
 otros mapas, no con el terreno. El test final usa la vara que el propio proyecto del caso

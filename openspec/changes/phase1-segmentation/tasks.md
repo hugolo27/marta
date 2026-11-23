@@ -34,5 +34,5 @@
 
 ## 6. Documentation
 
-- [ ] 6.1 Thesis chapters 2 and 3, `docs/PHASE1_SUMMARY.md`, `docs/METODOLOGIA_PIPELINE.md`
-- [ ] 6.2 `openspec validate phase1-segmentation --strict`, thesis compiles
+- [x] 6.1 Thesis chapters 2 and 3, `docs/PHASE1_SUMMARY.md`, `docs/METODOLOGIA_PIPELINE.md`: done 2026-11-23; chapter 2 adds GPU nondeterminism, wall-to-wall classification, the held-out method, the U-Net change rule and Seg-Grad-CAM, and marks 5 seeds as a convention; chapter 3 leads with selection, test, the seed repeat, held-out regions and the AOI change map, the 3x3 CNN kept as background; chapter 4 and both docs updated to match
+- [x] 6.2 `openspec validate phase1-segmentation --strict`, thesis compiles: both pass 2026-11-23

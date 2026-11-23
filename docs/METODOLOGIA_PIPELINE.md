@@ -323,9 +323,39 @@ caso de estudio ni sobre datos usados en entrenamiento. Combina dos verificacion
 la exactitud del clasificador en una región geográfica que nunca vio, y el contraste contra ESA
 WorldCover.
 
-## 5. Resultados: clasificación de cobertura, CNN contra Random Forest
+## 5. Resultados: clasificación de cobertura
 
-**Resumen**: la CNN gana la comparación de precisión sobre el conjunto de prueba del área de
+### 5.0 Resultado vigente: U-Net contra Random Forest (noviembre de 2026)
+
+Por indicación del tutor, la CNN de 3×3 se reemplazó por una U-Net que segmenta, medida con Dice
+a 30 m (change `phase1-segmentation`). Todas las reglas se registraron en MLflow antes de puntuar.
+
+| Contexto | U-Net | Random Forest | Resultado |
+|---|---|---|---|
+| Validación | 0,8277 ± 0,0024 | 0,8145 ± 0,0002 | U-Net mejor |
+| Test (una sola vez) | 0,8159 ± 0,0104 | 0,8113 ± 0,0002 | Empate |
+| Filadelfia (reservada) | 0,830 ± 0,008 | 0,810 ± 0,000 | U-Net mejor |
+| Bahía Negra (reservada) | 0,615 ± 0,006 | 0,588 ± 0,000 | U-Net mejor |
+| Pozo Colorado (reservada) | 0,605 ± 0,017 | 0,606 ± 0,001 | Empate |
+
+- Dice macro, 5 semillas por modelo (cantidad por convención: varias semillas según Henderson et
+  al., 2018, que advierten que 5 puede no alcanzar). Gana el que supera al otro por más que el
+  desvío combinado.
+- El empate en test deja a la U-Net como clasificador operativo, porque solo ella admite
+  explicaciones por predicción (Seg-Grad-CAM).
+- Las 4 semillas reentrenadas para las regiones reservadas no salieron idénticas a las del test
+  (el entrenamiento en GPU no es determinista); la semilla 2026 pasó de 0,7992 a 0,8246. El test
+  no se reemplaza. Detalle en `data/study_area/unet_selection/README.md`.
+- El Dice macro bajo de Bahía Negra y Pozo Colorado viene del cultivo, casi ausente en MapBiomas
+  ahí (4 y 3.895 celdas de más de 3 millones); en bosque la U-Net da 0,99 y 0,97.
+- Mapa de cambio del área del proyecto con el filtro elegido por la regla registrada (confianza
+  0,9 + unidad mínima de 0,5 ha, retiene el 70 % de la pérdida confirmada del área de desarrollo
+  con 0,4 ha de pérdida falsa): 5,1 ha de pérdida y 61,6 ha de ganancia 2019-2023. Muestra de 340
+  puntos sorteada sobre ese mapa. Detalle en `data/study_area/unet_change/README.md`.
+
+Las secciones 5.1 a 5.4 son el antecedente con la CNN de 3×3, ya no el sistema vigente.
+
+**Resumen (CNN, antecedente)**: la CNN gana la comparación de precisión sobre el conjunto de prueba del área de
 estudio (AOI); evaluada contra 3 sub-áreas geográficamente independientes, gana en 2 de las 3 y
 pierde claramente en la tercera (Filadelfia), por una razón identificada y específica de
 paisaje, no una falla de generalización sin explicar. **La CNN queda confirmada como clasificador
@@ -386,9 +416,9 @@ menonita) que no llenan la ventana de 330m — no bloques de bosque contiguo. La
 "bosque" en parte como un patrón espacial de canopy grande y continuo, que no transfiere a bosque
 fragmentado en tiras; Random Forest, al mirar solo el píxel central, no tiene ese modo de falla.
 
-### 5.4 Decisión: clasificador operativo
+### 5.4 Decisión de entonces: clasificador operativo (superada por la U-Net, 5.0)
 
-**La CNN queda confirmada como clasificador operativo del sistema** (Grad-CAM, comparación temporal,
+**La CNN quedó como clasificador operativo del sistema** (Grad-CAM, comparación temporal,
 estimación de carbono se construyen sobre ella): gana en 3 de los 4 contextos evaluados
 (AOI, Bahía Negra, Pozo Colorado) y pierde solo en Filadelfia, con una causa específica y
 entendida. Se considera aceptable porque el destino real de despliegue (el AOI de Corazón Verde

@@ -4,7 +4,7 @@
   columns: (10%, 60%, 30%),
   align: (left, left, left),
   table.header([*Fase*], [*Qué cubre*], [*Estado*]),
-  [1], [Área de estudio, dataset Sentinel-2+MapBiomas, CNN, baseline RF, comparación temporal, Grad-CAM; validación independiente de la detección de cambio], [Implementada; detección de cambio corregida; evaluación de exactitud con puntos interpretados en preparación],
+  [1], [Área de estudio, dataset Sentinel-2+MapBiomas, U-Net, baseline RF, comparación temporal, Seg-Grad-CAM; validación independiente de la detección de cambio], [Implementada con la U-Net; muestra de referencia sorteada, falta interpretar los 640 puntos],
   [2], [Altura de dosel (inferencia) + calibración GEDI L4A + carbono/CO2; candidato con SAR (Sentinel-1, PALSAR-2) a confirmar con el tutor], [Propuesta, sin implementar],
   [3], [Validación (ecuaciones alométricas y/o datos de campo)], [Pendiente],
   [4], [Demo de auditoría (Corazón Verde del Chaco) + prototipo integrado], [Pendiente],
