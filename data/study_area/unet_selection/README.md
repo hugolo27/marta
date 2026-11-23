@@ -142,3 +142,17 @@ not versioned here), sha256 `eec2fb794861ade7640fe1497deb59ea784e14dba37c534f6ff
   Forest, not from its device rule.
 - `sessions.json` lists nine test sessions. The first two were reclaimed before any score was
   output or saved; the others resumed from the last pushed run.
+
+### Repeating a seed
+
+- The held-out regions are scored with the five seeds of the test, and the test kept only seed 42's
+  checkpoint, so the other four were retrained (notebook mode `semillas`) on the same commit,
+  device and configuration. Seed 1 came out at 0.8215 test macro Dice against 0.8234 in the test
+  run (-0.0019): training on the GPU is not bit-for-bit deterministic, even with the same seed on
+  the same device (PyTorch documentation, "Reproducibility"). The Hardware rule removes differences
+  between platforms, not this run-to-run noise; the gap is a fifth of the seed standard deviation
+  (0.0104), which already includes it, so no conclusion changes.
+- The retrained checkpoints are new runs of the selected configuration, used only for the held-out
+  regions; their test scores, measured only to quantify the gap, are in `retrained.json` on
+  `molab-state`. The test result above and the operational checkpoint (seed 42, sha256
+  eec2fb794861...) are the test's own.

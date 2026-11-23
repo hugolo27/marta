@@ -62,9 +62,11 @@ def _(mo):
     `results.json` also go to `molab-state`.
     **semillas** retrains the U-Nets of seeds 1, 7, 123 and 2026 exactly as the test did, on the same
     commit and GPU, and pushes each checkpoint to `molab-state`: the held-out regions are scored with
-    the five seeds of the test, and the test only kept seed 42. Each retrained model is scored on the
-    test split again only to check it is the same model: its macro Dice must equal the one in
-    `test_runs.json`, or the cell stops and the checkpoint is not used.
+    the five seeds of the test, and the test only kept seed 42. GPU training is not bit-for-bit
+    deterministic (PyTorch, Reproducibility), so a retrained seed is a new run of the same
+    configuration, not the test's model: each one is scored on the test split again only to measure
+    that difference, which goes with its checkpoint to `retrained.json`. The test result stays the
+    one in `results.json`.
     """)
     return
 
@@ -372,6 +374,10 @@ def _(RESULTS, STATE_DIR, json, log_session, mo, mode, push, selection_script, u
     log_session("checkpoints")
     _data, _decisions, _sel = _s.splits(), _s.pilot_decisions(), _results["selection"]
     _test = json.loads((STATE_DIR / "test_runs.json").read_text())["unet"]
+    try:
+        _retrained = json.loads((STATE_DIR / "retrained.json").read_text())
+    except FileNotFoundError:
+        _retrained = {}
     for _seed in [s for s in _s.selection.SEEDS if s != 42]:
         _name = f"unet_checkpoint_seed{_seed}.pt"
         if (STATE_DIR / _name).exists():
@@ -383,12 +389,14 @@ def _(RESULTS, STATE_DIR, json, log_session, mo, mode, push, selection_script, u
                                         random_window=True, **_sel["unet"])
         _, _macro = _s.classifier_report.dice_from_counts(unet.predict_counts_full(_model, _data["test"], _device).sum(axis=0))
         _recorded = _test[str(_seed)]["macro_dice"]
-        print(f"seed {_seed}: test macro Dice {_macro:.6f}, recorded {_recorded:.6f}", flush=True)
-        if abs(_macro - _recorded) > 1e-6:
-            raise RuntimeError(f"seed {_seed} is not the model of the test: checkpoint not saved")
+        print(f"seed {_seed}: test macro Dice {_macro:.6f}, test run {_recorded:.6f}, difference {_macro - _recorded:+.6f}", flush=True)
         unet.save_checkpoint(_model, _seed, path=unet.OUT_DIR / _name)
         push(unet.OUT_DIR / _name, _name)
-        print(f"seed {_seed}: {_name} pushed", flush=True)
+        _retrained[str(_seed)] = {"macro_dice": float(_macro), "test_run_macro_dice": _recorded}
+        with open("retrained.json", "w") as _f:
+            json.dump(_retrained, _f, indent=2)
+        push("retrained.json", "retrained.json")
+        print(f"seed {_seed}: {_name} and retrained.json pushed", flush=True)
     return
 
 
