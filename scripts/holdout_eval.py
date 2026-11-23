@@ -137,6 +137,7 @@ def segmentation_models(seeds=SEEDS):
     sel = json.loads(selection.RESULTS_PATH.read_text())["selection"]
     data, decisions = selection.splits(), selection.pilot_decisions()
     rfs = [train_rf.train_tiles(data["train"], seed=s, max_samples=decisions["rf_max_samples"], **sel["rf"]) for s in seeds]
+    dl._load_full_tile.cache_clear()
     return unets, rfs
 
 

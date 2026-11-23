@@ -147,12 +147,25 @@ not versioned here), sha256 `eec2fb794861ade7640fe1497deb59ea784e14dba37c534f6ff
 
 - The held-out regions are scored with the five seeds of the test, and the test kept only seed 42's
   checkpoint, so the other four were retrained (notebook mode `semillas`) on the same commit,
-  device and configuration. Seed 1 came out at 0.8215 test macro Dice against 0.8234 in the test
-  run (-0.0019): training on the GPU is not bit-for-bit deterministic, even with the same seed on
-  the same device (PyTorch documentation, "Reproducibility"). The Hardware rule removes differences
-  between platforms, not this run-to-run noise; the gap is a fifth of the seed standard deviation
-  (0.0104), which already includes it, so no conclusion changes.
+  device and configuration. Training on the GPU is not bit-for-bit deterministic, even with the
+  same seed on the same device (PyTorch documentation, "Reproducibility"): the runs drift apart and
+  early stopping ends them at different epochs. The Hardware rule removes differences between
+  platforms, not this run-to-run variation.
+
+| Seed | Test run | Retrained | Gap |
+|---|---|---|---|
+| 1 | 0.8234 | 0.8218 | -0.0016 |
+| 7 | 0.8236 | 0.8210 | -0.0026 |
+| 123 | 0.8210 | 0.8205 | -0.0005 |
+| 2026 | 0.7992 | 0.8246 | +0.0254 |
+
+- (A first retraining of seed 1, stopped by a stricter check that required identical scores, gave
+  0.8215; its checkpoint was not kept.)
+- Seed 2026, the lowest test run by far, comes out with the others when repeated: most of that run's
+  gap was the run, not the seed. The U-Net's test spread (0.0104) is therefore driven largely by one
+  unfavourable run, and the tie on test is a cautious result, not evidence that the U-Net is worse.
+  The test result stays as pre-registered and run once: replacing a run after seeing it would be
+  choosing the result. It does not change the operational classifier, which is the U-Net either way.
 - The retrained checkpoints are new runs of the selected configuration, used only for the held-out
-  regions; their test scores, measured only to quantify the gap, are in `retrained.json` on
-  `molab-state`. The test result above and the operational checkpoint (seed 42, sha256
-  eec2fb794861...) are the test's own.
+  regions; their test scores, measured only to quantify the gap, are in `retrained.json`. The test
+  result above and the operational checkpoint (seed 42, sha256 eec2fb794861...) are the test's own.
