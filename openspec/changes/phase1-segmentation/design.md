@@ -30,7 +30,7 @@ See proposal.md. Current state (phase1-dataset-v2): 5,993 patches of 33x33x26 wi
 | Number of tiles | learning curve (D4) | Ning et al. (2020) |
 | RF per-tree sample | learning curve (D4) | Bagging trains each tree on a bootstrap sample; its size is measured, not fixed |
 | Blocks | 6 km | Semivariogram, phase1-dataset-v2 D1 |
-| Seeds, rule | 5 seeds, pooled std | Henderson et al. (2018); Cohen's d > 1 (Cohen, 1988) |
+| Seeds, rule | 5 seeds, pooled std | Several seeds: Henderson et al. (2018), who also warn 5 may not suffice; the number 5 is a convention balancing the std estimate against compute. Rule: Cohen's d > 1 (Cohen, 1988) |
 | Grad-CAM | Seg-Grad-CAM | Vinogradova et al. (2020) |
 
 ### D1. Tiles
