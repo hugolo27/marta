@@ -1,7 +1,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: CNN candidate
-The system SHALL train a U-Net for semantic segmentation on Sentinel-2 tiles from the dataset's train split (dry and wet composites, 26 channels), predicting one of the 3 target classes per pixel, SHALL average its 10 m class probabilities over each 3x3 block so that training and evaluation happen at the 30 m resolution of the MapBiomas labels, SHALL ignore pixels whose label is outside the 3 target classes, and SHALL record for each training run the epoch with the best validation macro Dice and the epoch at which training stopped.
+The system SHALL train a U-Net for semantic segmentation on the train split's Sentinel-2 tiles (dry and wet composites, 26 channels), predicting one of the 3 target classes per pixel, with its 10 m class probabilities averaged over each 3x3 block so that training and evaluation happen at the 30 m resolution of the MapBiomas labels, and SHALL record for each run the epoch with the best validation macro Dice and the stop epoch.
 
 #### Scenario: Candidate trained
 - **WHEN** the train split's tiles and label maps are available
@@ -14,6 +14,28 @@ The system SHALL train a U-Net for semantic segmentation on Sentinel-2 tiles fro
 #### Scenario: Training reaches the epoch cap
 - **WHEN** a run reaches the maximum number of epochs without early stopping
 - **THEN** the run is flagged as truncated and is not used for any decision until re-run with a higher cap
+
+### Requirement: Cross-region generalization check
+The system SHALL evaluate both models on held-out sub-regions spanning distinct landscape topologies, geographically excluded from training, validation, and hyperparameter tuning, by classifying each region wall to wall at 30 m and scoring per-class and macro Dice against MapBiomas on every labeled cell, and SHALL run each region's comparison across the 5 seeds of the test rather than a single run, so a region-level result can be told apart from single-run noise.
+
+#### Scenario: Generalization metrics reported
+- **WHEN** a held-out region is evaluated
+- **THEN** the system reports mean and sample standard deviation of macro Dice and per-class Dice for both models in that region, the better-than result under the test's rule, and the test-split metrics alongside
+
+#### Scenario: A seed retrained for the check
+- **WHEN** a seed's checkpoint was not kept by the test and the model is retrained with the same configuration, seed, commit and device
+- **THEN** the retrained model is used as a new run of that configuration, and its gap to the test run of the same seed is measured and reported, since GPU training is not bit-for-bit deterministic
+
+#### Scenario: A single held-out region is insufficient to characterize generalization
+- **WHEN** only one held-out region has been evaluated
+- **THEN** the system SHALL NOT treat that region's result as representative of generalization in general; a landscape-specific weakness must be distinguished from a general one using additional, topologically distinct held-out regions before it informs the operational-classifier decision
+
+### Requirement: ESA WorldCover cross-check
+The system SHALL cross-check both models' predictions over each held-out region against ESA WorldCover labels on the same 30 m cells, independent of the MapBiomas-derived training labels.
+
+#### Scenario: Cross-check produced
+- **WHEN** a model's predictions over a held-out region are available
+- **THEN** the system reports agreement between those predictions and ESA WorldCover, noting explicitly that the "pasto" comparison is a weaker proxy than "bosque" or "cultivo" (per the documented WorldCover legend limitation)
 
 ## ADDED Requirements
 
