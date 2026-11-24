@@ -2,19 +2,146 @@
 
 == Resumen ejecutivo
 
-Se comparó un clasificador Random Forest (baseline, per-píxel) contra una CNN chica y
-propia (candidata, con un bloque de 3×3 píxeles) para distinguir bosque, pasto
-y cultivo sobre Sentinel-2, con los compuestos de época seca y húmeda, usando MapBiomas Chaco como etiqueta. La comparación se hizo
-bajo un criterio de significancia fijado antes de ver resultados, y se extendió con una
-evaluación de generalización geográfica sobre 3 sub-áreas held-out de paisajes distintos.
+Se comparó una U-Net que segmenta (candidata, con contexto espacial) contra un Random Forest
+por celda (referencia) para distinguir bosque, pasto y cultivo sobre Sentinel-2, con los
+compuestos de época seca y húmeda y MapBiomas Chaco como etiqueta. Todas las reglas de
+selección, test y mapa de cambio se escribieron y registraron antes de puntuar.
 
-*Resultado*: la CNN gana la comparación de precisión sobre el AOI, y gana en 2 de las 3
-sub-áreas held-out independientes -- pierde solo en una (Filadelfia, Boquerón), por un
-margen mucho menor que con las versiones anteriores del modelo y con una causa identificada
-y específica de paisaje. *La CNN queda confirmada como clasificador operativo del
-sistema*, con esa limitación documentada explícitamente.
+*Resultado:* la U-Net gana en validación, empata en test y gana en 2 de las 3 regiones
+reservadas (empata en la tercera). Por la regla fijada, un empate deja a la U-Net como
+clasificador operativo, porque solo ella admite explicaciones por predicción. Con ella se
+mapeó el cambio 2019-2023 del área del proyecto y se sorteó la muestra de referencia que
+falta interpretar. La CNN de 3×3, operativa antes, queda como antecedente al final del
+capítulo.
 
-== Resultados sobre el AOI
+== Selección en validación
+
+La selección corrió del 18 al 20 de noviembre de 2026 en molab (una GPU NVIDIA RTX PRO 6000
+Blackwell), con 27 configuraciones de U-Net y 18 de Random Forest, 5 semillas cada una:
+
+#table(
+  columns: (auto, 1fr, auto),
+  align: (left, left, center),
+  table.header([*Modelo*], [*Configuración*], [*Dice macro (val.)*]),
+  [U-Net, mejor de 48 px], [`lr` 0,001, lote 32], [0,8277 ± 0,0024],
+  [U-Net, mejor de 96 px], [], [0,8232],
+  [U-Net, mejor de 192 px], [], [0,8205],
+  [Random Forest], [500 árboles, sin límite de profundidad, `max_features` 0,5], [0,8145 ± 0,0002],
+)
+
+`lr` 0,001 y lote 32 son bordes de la grilla, así que se probó un paso más (`lr` 0,003 dio
+0,8228 y lote 64, 0,8235): ninguno superó a la elegida. La diferencia entre U-Net y Random
+Forest (0,0132) supera el desvío combinado (0,0017), así que en validación la U-Net es mejor.
+El recorte más chico (48 px, 480 m) gana a los más grandes.
+
+== Test
+
+El test se corrió una sola vez, con los modelos ya elegidos:
+
+#table(
+  columns: (auto, auto, auto, auto, auto),
+  align: (left, center, center, center, center),
+  table.header([*Modelo*], [*Dice macro*], [*Bosque*], [*Pasto*], [*Cultivo*]),
+  [U-Net], [0,8159 ± 0,0104], [0,948], [0,870], [0,630],
+  [Random Forest], [0,8113 ± 0,0002], [0,945], [0,870], [0,619],
+)
+
+La diferencia (0,0047) queda por debajo del desvío combinado (0,0074): *en test los dos
+empatan*, contra una brecha clara en validación. Según la regla de selección del
+clasificador operativo, un empate deja a la U-Net, porque solo un modelo con gradientes y
+mapas de activación admite Grad-CAM por predicción; el Random Forest queda como hallazgo de
+referencia. El error dominante de los dos es el cultivo, confundido con pasto.
+
+*Repetición de semillas.* Las regiones reservadas se miden con las 5 semillas del test, y del
+test solo se guardó el modelo de la semilla 42, así que las otras cuatro se reentrenaron con la
+misma configuración, el mismo código y la misma GPU. Como el entrenamiento en GPU no es
+determinista (capítulo 2), no salieron idénticas:
+
+#table(
+  columns: (auto, auto, auto, auto),
+  align: (left, center, center, center),
+  table.header([*Semilla*], [*En el test*], [*Reentrenada*], [*Diferencia*]),
+  [1], [0,8234], [0,8218], [−0,0016],
+  [7], [0,8236], [0,8210], [−0,0026],
+  [123], [0,8210], [0,8205], [−0,0005],
+  [2026], [0,7992], [0,8246], [+0,0254],
+)
+
+La semilla 2026, la peor del test por lejos, al repetirla queda con las demás: buena parte del
+desvío de la U-Net en test (0,0104) viene de una corrida desfavorable, así que el empate es un
+resultado prudente y no indica que la U-Net sea peor. El resultado del test no se reemplaza:
+cambiar una corrida después de verla sería elegir el resultado. Los modelos reentrenados se usan
+solo en las regiones reservadas.
+
+== Regiones reservadas
+
+Cada región se clasificó entera en 2019 y 2023 (entre 3,3 y 3,6 millones de celdas de 30 m con
+etiqueta por región) con las 5 semillas de cada modelo, contra MapBiomas:
+
+#table(
+  columns: (auto, 1fr, auto, auto, auto),
+  align: (left, left, center, center, left),
+  table.header([*Región*], [*Paisaje*], [*U-Net*], [*RF*], [*Resultado*]),
+  [Filadelfia], [Colonia menonita, bosque fragmentado], [0,830 ± 0,008], [0,810 ± 0,000], [*U-Net gana*],
+  [Bahía Negra], [Bosque continuo, remoto], [0,615 ± 0,006], [0,588 ± 0,000], [*U-Net gana*],
+  [Pozo Colorado], [Ganadería, ruta Trans-Chaco], [0,605 ± 0,017], [0,606 ± 0,001], [Empate],
+)
+
+En Filadelfia, donde la CNN de 3×3 perdía por las cortinas rompevientos angostas, la U-Net
+gana por más del triple del desvío combinado (0,019 contra 0,006). El Dice macro bajo de Bahía
+Negra y Pozo Colorado viene del cultivo: según MapBiomas hay 4 celdas de cultivo en Bahía Negra
+y 3.895 en Pozo Colorado, de más de 3 millones, así que todo cultivo que marque un modelo cuenta
+como error (Dice de cultivo 0,00 y 0,16) y arrastra el promedio de tres clases. En bosque, la
+clase que define la pérdida, la U-Net da 0,99 y 0,97. Se informa tal cual, sin corregir la
+métrica después de verla. El acuerdo de bosque con WorldCover 2021 es casi igual para los dos
+modelos (0,97, 0,47 y 0,71 la U-Net; 0,97, 0,47 y 0,73 el Random Forest); el valor bajo de Bahía
+Negra marca diferencias entre las dos referencias en ese paisaje más que entre los modelos.
+
+== Mapa de cambio del área del proyecto
+
+Con el modelo operativo (semilla 42) se clasificaron el área del proyecto y el área de
+desarrollo en 2019, 2022 y 2023. La regla registrada puntuó 12 configuraciones de filtro en el
+área de desarrollo, que tiene 4.848,9 ha de pérdida confirmada por Hansen y MapBiomas y
+9.519,1 ha de bosque estable confirmado:
+
+#table(
+  columns: (1fr, auto, auto),
+  align: (left, center, center),
+  table.header([*Filtro*], [*Pérdida confirmada retenida*], [*Pérdida falsa*]),
+  [Sin filtro], [95,6 %], [26,3 ha],
+  [Confianza 0,7], [92,0 %], [6,7 ha],
+  [Confianza 0,9 + unidad mínima (elegido)], [70,2 %], [0,4 ha],
+  [Confianza 0,9 + persistencia + unidad mínima], [68,1 %], [0,4 ha],
+)
+
+Las 12 retienen más de la mitad; la pérdida falsa mínima es 0,4 ha y la logran dos
+configuraciones, y entre ellas la regla elige la de menos pasos: *confianza 0,9 y unidad mínima
+de 0,5 ha*. El filtro casi no marca pérdida falsa, pero deja pasar el 30 % de la pérdida
+confirmada; ese costo lo mide el estrato de cambio descartado de la muestra de referencia.
+
+Aplicado una vez al área del proyecto, da 5,1 ha de pérdida (57 celdas) y 61,6 ha de ganancia
+entre 2019 y 2023, sobre 20.063,6 ha de bosque estable; ni Hansen ni MapBiomas confirman pérdida
+allí. La ganancia queda a verificar con la muestra.
+
+*Seg-Grad-CAM.* Se explicaron dos manchas de pérdida en ambas fechas: por qué la U-Net las
+llamó bosque en 2019 y qué las llamó en 2023. Volver a predecir todas las ventanas que cubren
+cada celda explicada devuelve las probabilidades guardadas en el mapa (diferencia máxima
+8,4·10#super[-5]), así que la explicación corresponde exactamente a la predicción mapeada.
+
+*Muestra de referencia.* Sobre este mapa se sortearon, antes de interpretar nada, los 340
+puntos de la evaluación de exactitud en los seis estratos del capítulo 2 (en celdas: pérdida 57,
+ganancia 684, cambio descartado 5.398, franja 334, bosque estable 221.812, no bosque estable
+399). Su interpretación a ciegas, junto con 300 puntos en las regiones reservadas, da la
+exactitud y el área de pérdida ajustada por error con la que cierra la fase.
+
+== Antecedente: la CNN de 3×3
+
+Antes de la U-Net, el clasificador con contexto era una CNN chica y propia con un bloque de
+3×3 píxeles, comparada con el mismo Random Forest bajo reglas equivalentes. Por indicación del
+tutor se reemplazó por la U-Net (capítulo 2). Las secciones siguientes documentan ese camino y
+sus resultados, que ya no son los del sistema.
+
+=== Resultados sobre el AOI
 
 Sobre el conjunto de prueba (915 ejemplos en bloques de 6 km, nunca usados en
 entrenamiento ni ajuste), promediando 5 corridas con distinta semilla, con las variantes y
@@ -36,7 +163,7 @@ para el RF y 0,860 para la CNN de 33×33, pero con bloques más chicos que el al
 autocorrelación espacial, así que esos números probablemente eran optimistas (sección
 "Autocorrelación espacial").
 
-== Evaluación de generalización geográfica
+=== Evaluación de generalización geográfica
 
 El AOI por sí solo no prueba generalización -- sus ejemplos de prueba salen de la misma
 huella de entrenamiento. Se evaluaron ambos modelos contra 3 sub-áreas geográficamente
@@ -68,14 +195,14 @@ central, no tiene ese modo de falla. Con la entrada de 3×3 (90 m) la brecha se 
 0,125 a 0,015, lo que es consistente con ese diagnóstico, aunque la falla no se volvió a
 analizar punto por punto con el modelo nuevo.
 
-== Decisión: clasificador operativo
+=== Decisión de entonces: la CNN como clasificador operativo
 
 Grad-CAM -- la evidencia auditable por predicción individual que responde la pregunta de
 investigación central del proyecto -- solo puede engancharse a un modelo diferenciable
 con mapas de activación espaciales; Random Forest no puede darla bajo ninguna
 implementación.
 
-*La CNN queda confirmada como clasificador operativo del sistema.* Gana en 3 de los 4
+*En ese momento la CNN quedó como clasificador operativo del sistema*, decisión superada por la U-Net. Gana en 3 de los 4
 contextos evaluados (AOI, Bahía Negra, Pozo Colorado) y pierde solo en Filadelfia,
 con causa identificada. Se considera aceptable porque el destino real de despliegue -- el
 AOI de Corazón Verde del Chaco, Fase 4 -- está dentro de la huella de entrenamiento y no
@@ -85,7 +212,7 @@ es un paisaje de colonia fragmentada como Filadelfia.
 para clasificar bosque en paisajes con fragmentación estructuralmente similar a
 Filadelfia.
 
-== Hiperparámetros: primera selección en validación (dataset anterior)
+=== Hiperparámetros: primera selección en validación (dataset anterior)
 
 Esta sección y las dos siguientes documentan el camino hasta el modelo final, sobre el
 dataset anterior (400 ejemplos por clase y año, bloques de ~2 km, solo época seca, CNN de
@@ -120,7 +247,7 @@ Como la CNN operativa cambió, se volvieron a correr la clasificación del AOI, 
 cambio (con la misma regla de post-proceso, sin modificar), Grad-CAM y el sorteo de la
 muestra de referencia, que todavía no se había interpretado.
 
-== Tamaño de entrada de la CNN: 3×3 contra 33×33
+=== Tamaño de entrada de la CNN: 3×3 contra 33×33
 
 Cada píxel de MapBiomas se alinea con un bloque de 3×3 píxeles de Sentinel-2, para conservar
 la resolución nativa de 10 m. La CNN usaba una ventana de 33×33 centrada en ese bloque para
@@ -148,7 +275,7 @@ ejemplos) resultó demasiado chico para separar las dos variantes. A partir de e
 el trabajo sigue con la entrada de 3×3, sobre un dataset más grande (sección "Dataset final
 y selección de variantes").
 
-== Autocorrelación espacial y tamaño de los bloques
+=== Autocorrelación espacial y tamaño de los bloques
 
 La partición asigna bloques espaciales completos a entrenamiento, validación o test. El
 lado de ~2 km se había fijado como "más de 6 veces el lado de la ventana". La literatura
@@ -175,7 +302,7 @@ Además se corrigió cómo se asignaban los bloques: se armaban por separado par
 así que un mismo cuadrado podía mandar sus puntos de bosque a entrenamiento y los de pasto a
 test. En el dataset nuevo todos los puntos de un bloque van al mismo grupo.
 
-== Dataset final y selección de variantes
+=== Dataset final y selección de variantes
 
 El dataset final tiene 5.993 ejemplos (4.157 de entrenamiento, 921 de validación y 915 de
 test); la época húmeda no hizo descartar ningún ejemplo por nubes y cada clase quedó con
@@ -215,7 +342,7 @@ La ganancia, mucho mayor que con el modelo anterior (0,5 ha), queda a verificar 
 muestra de referencia. Con entrada de 3×3, Grad-CAM produce un mapa de 3×3 píxeles: indica
 qué parte del bloque pesó en la predicción, pero no da contexto espacial.
 
-== Trazabilidad: 9 rondas de revisión
+=== Trazabilidad: 9 rondas de revisión
 
 La conclusión cambió de dirección varias veces a lo largo del proceso: "RF gana claro" →
 "empate técnico" → "CNN gana" → confirmación de que la brecha de Filadelfia era real →
@@ -233,6 +360,8 @@ documento hasta la corrida exacta que lo produjo.
 
 == Próximos pasos
 
+- Fase 1: interpretar a ciegas los 640 puntos de referencia y calcular la exactitud y el área de
+  pérdida ajustada por error (Stehman, 2014; Olofsson et al., 2014).
 - Fase 2: estimación de carbono (altura de dosel + calibración GEDI L4A + conversión a
   CO2e): propuesta, sin implementar.
 - Fase 3: validación contra ecuaciones alométricas o datos de campo, si hay acceso.

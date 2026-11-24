@@ -80,6 +80,14 @@ See proposal.md for motivation. Relevant current state:
 - When a stratum shows no reference loss, its SE contribution is zero and the interval would look falsely narrow. The rule-of-three bound per such stratum is added to the CI upper limit and reported as the loss upper bound, phrased as "loss not distinguishable from zero, upper bound X" when the estimate's interval includes zero.
 - Near-threshold point-dates are kept, and accuracy is also reported without them as a sensitivity check.
 
+**MapBiomas Chaco and MapBiomas Paraguay as assessed maps.** Rules fixed 2026-11-12, before any point is interpreted.
+- Both collections are read in Google Earth Engine at each reference point (the native 30 m pixel containing it) for the point's dates, and over the whole AOI for the agreement map. The exact asset paths and versions are recorded in the results JSON.
+- Forest/non-forest remap: MapBiomas Chaco as already done in `scripts/mapbiomas_legend.py`; MapBiomas Paraguay from its official legend, read in the original document before use. Codes with no clear forest/non-forest meaning are listed and reported, not guessed.
+- Same estimators as for the classifier: Stehman (2014) with the stored strata, since the strata come from the classifier's change map, not from either collection; error-adjusted loss area with a 95% CI and the rule-of-three bound (Olofsson et al., 2014).
+- Agreement between the collections: share of AOI cells with the same class per date, and share of each one's 2019-2023 loss the other also marks.
+- No decision on the training labels is taken here. A switch would need its own change and, under the program's rules, counts as a change of data (form TFM-05).
+- Alternative rejected: retraining on MapBiomas Paraguay. It would redo the tiles, the pilots, the split and the pre-registrations without evidence that it is better in the study area; this comparison is that evidence.
+
 **Gate outcome is recorded, not acted on here.**
 - A pass clears the CNN for Fase 2 under the VM0007 bar.
 - A fail records the error analysis and scopes a classifier-level change, for example relabeling training data where MapBiomas disagrees with the Paraguayan definition, or a dedicated forest/non-forest decision threshold.
@@ -91,4 +99,6 @@ See proposal.md for motivation. Relevant current state:
 - **[Risk] Imagery dates differ from the composite season** → Forest/non-forest (the gated split) depends on woody structure, which is far less seasonal than the pasture/crop split. The date is recorded, so any seasonal pattern in disagreements is visible.
 - **[Risk] The interpreter is not a trained photo-interpreter, and is the model's author** → A written protocol with example points per class comes before labeling, crown is counted on a grid, uncertain calls go into notes or the near-threshold flag, and the 20% repeat (second interpreter preferred) quantifies the effect.
 - **[Trade-off] Smaller sample (340 AOI points) than the original plan (~500)** → It still meets the VM0007 minimum with margin. The cost is wider confidence intervals, and a loss bound of a few hundred hectares, which are reported rather than hidden.
+- **[Risk] The two MapBiomas legends do not map one to one** → Each code's forest/non-forest assignment is listed with its legend wording, and ambiguous codes are reported separately rather than forced.
+- **[Trade-off] The AOI is near-intact forest with no cropland** → The AOI comparison speaks to forest/non-forest and small loss only; the three held-out regions add agricultural landscapes for 2023.
 - **[Risk] The result is a fail** → A valid, reportable finding. It is what the gate exists to catch before the carbon figure inherits it.

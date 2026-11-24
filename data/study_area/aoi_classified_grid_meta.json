@@ -1,15 +1,16 @@
 {
-  "n_rows": 7,
-  "n_cols": 3,
-  "tile_core_px": 400,
-  "pixel_m": 10,
+  "n_rows": 824,
+  "n_cols": 312,
+  "pixel_m": 30,
   "utm_crs": "EPSG:32721",
   "aoi_utm_bounds": [
-    350617.47079411533,
-    7511106.009562685,
-    359421.8497062744,
-    7535174.696622295
+    350370,
+    7510710,
+    359730,
+    7535430
   ],
+  "tile_px": 48,
+  "checkpoint_sha256": "eec2fb794861ade7640fe1497deb59ea784e14dba37c534f6fffb9cf3ab16fa9",
   "class_names": [
     "bosque",
     "pasto",

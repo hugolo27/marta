@@ -40,3 +40,10 @@
 - [ ] 7.1 Record the gate outcome in `data/study_area/accuracy_assessment/README.md`. Pass: the CNN is cleared for Fase 2 under the VM0007 bar. Fail: summarize the error analysis and scope the classifier-level follow-up change. Verified by the README stating the outcome with links to the results JSONs
 - [ ] 7.2 Update `docs/METODOLOGIA_PIPELINE.md` (protocol, AOI and held-out results, error-adjusted areas as the downstream figure) and `docs/FOUNDATION.md`/`FOUNDATION.es.md` point 7 with the results, verified by every document citing change areas with their error-adjusted estimate and CI
 - [ ] 7.3 Run `openspec validate phase1-accuracy-assessment --strict` and confirm it passes
+
+## 8. MapBiomas Chaco vs. MapBiomas Paraguay (does not block Fase 2)
+
+- [ ] 8.1 Find the MapBiomas Paraguay Collection 3 asset in Google Earth Engine and its official legend; write the forest/non-forest remap for both collections with each code's legend wording, verified by every code present in the AOI and the held-out regions having an assignment or being listed as ambiguous
+- [ ] 8.2 Sample both collections at every AOI point (2019, 2023) and held-out point (2023), verified by one value per point-date per collection and the asset paths recorded
+- [ ] 8.3 Extend `28_assess_aoi_accuracy.py` and `30_assess_heldout_accuracy.py` to assess the two collections next to the classifier with the same estimators, verified by the results JSONs holding one entry per map with accuracies, CIs and, in the AOI, error-adjusted loss with its interval
+- [ ] 8.4 Agreement between the collections over the whole AOI (per date and in 2019-2023 loss) with a disagreement map, verified by the shares summing correctly and the map saved next to the results

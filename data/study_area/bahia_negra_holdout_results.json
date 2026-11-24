@@ -1,124 +1,115 @@
 {
-  "n_points": 241,
-  "aoi_test_split_reference": {
-    "rf_5seed_mean_macro_f1": 0.8413127138025353,
-    "cnn_5seed_mean_macro_f1": 0.865077865777377,
-    "note": "5-seed means from comparison_results.json (scripts/11_compare_classifiers.py), read live rather than hardcoded so this can't go stale when that file is regenerated."
-  },
-  "bahia_negra_holdout": {
-    "seeds": [
-      42,
-      1,
-      7,
-      123,
-      2026
-    ],
-    "rf": {
-      "macro_f1_mean": 0.620614657210402,
-      "macro_f1_std": 0.001287955376184838,
-      "macro_f1_runs": [
-        0.6226,
-        0.6197,
-        0.6213,
-        0.6197,
-        0.6197
-      ],
-      "accuracy_mean": 0.9062240663900415,
-      "accuracy_std": 0.0022727077074903078,
-      "iou_per_class_mean": {
-        "bosque": 0.8952,
-        "pasto": 0.847,
-        "cultivo": 0.0
-      },
-      "iou_per_class_std": {
-        "bosque": 0.0,
-        "pasto": 0.0066,
-        "cultivo": 0.0
-      }
+  "unet": {
+    "macro_dice_mean": 0.6154444761999933,
+    "macro_dice_std": 0.005457463484340238,
+    "macro_dice_runs": {
+      "42": 0.617,
+      "1": 0.6083,
+      "7": 0.6124,
+      "123": 0.6167,
+      "2026": 0.6228
     },
-    "cnn": {
-      "macro_f1_mean": 0.6265353732410774,
-      "macro_f1_std": 0.005166348751968304,
-      "macro_f1_runs": [
-        0.6314,
-        0.6229,
-        0.6314,
-        0.6271,
-        0.6198
-      ],
-      "accuracy_mean": 0.9203319502074688,
-      "accuracy_std": 0.009462036722814442,
-      "iou_per_class_mean": {
-        "bosque": 0.8974,
-        "pasto": 0.8758,
-        "cultivo": 0.0
-      },
-      "iou_per_class_std": {
-        "bosque": 0.009,
-        "pasto": 0.0196,
-        "cultivo": 0.0
-      }
+    "dice_mean": {
+      "bosque": 0.9925,
+      "pasto": 0.8539,
+      "cultivo": 0.0
     },
-    "pooled_std": 0.003764969354324672,
-    "cnn_minus_rf": 0.005920716030675455,
-    "winner": "cnn",
-    "note": "5-seed mean/std (code review 2026-09-12), same protocol as 11_compare_classifiers.py's AOI comparison \u2014 replaces the earlier single seed=42-only numbers, which had no variance estimate."
+    "dice_std": {
+      "bosque": 0.0012,
+      "pasto": 0.0152,
+      "cultivo": 0.0
+    }
   },
+  "rf": {
+    "macro_dice_mean": 0.5875773207507262,
+    "macro_dice_std": 0.00039014874448926374,
+    "macro_dice_runs": {
+      "42": 0.5878,
+      "1": 0.5875,
+      "7": 0.5869,
+      "123": 0.5879,
+      "2026": 0.5878
+    },
+    "dice_mean": {
+      "bosque": 0.9868,
+      "pasto": 0.7759,
+      "cultivo": 0.0
+    },
+    "dice_std": {
+      "bosque": 0.0001,
+      "pasto": 0.0011,
+      "cultivo": 0.0
+    }
+  },
+  "pooled_std": 0.003868857953306999,
+  "unet_minus_rf": 0.0278671554492671,
+  "seeds": [
+    42,
+    1,
+    7,
+    123,
+    2026
+  ],
+  "winner": "unet",
   "worldcover_cross_check": {
+    "unet": {
+      "agreement_rate": {
+        "bosque": 0.4684074871008849,
+        "pasto": 0.8085483335178828,
+        "cultivo": 0.1288056206088993
+      },
+      "confusion": {
+        "bosque": {
+          "other": 1563142,
+          "bosque": 1480941,
+          "pasto (proxy debil)": 115863,
+          "cultivo": 1705
+        },
+        "pasto": {
+          "other": 18884,
+          "bosque": 6011,
+          "pasto (proxy debil)": 124134,
+          "cultivo": 4498
+        },
+        "cultivo": {
+          "other": 305,
+          "bosque": 15,
+          "pasto (proxy debil)": 3028,
+          "cultivo": 495
+        }
+      }
+    },
     "rf": {
       "agreement_rate": {
-        "bosque": 0.5470085470085471,
-        "pasto": 0.7913043478260869,
-        "cultivo": 0.1111111111111111
+        "bosque": 0.47427526001603676,
+        "pasto": 0.6648783831011742,
+        "cultivo": 0.10718599033816426
       },
       "confusion": {
         "bosque": {
-          "other": 47,
-          "bosque": 64,
-          "pasto (proxy debil)": 6,
-          "cultivo": 0
+          "other": 1532166,
+          "bosque": 1468065,
+          "pasto (proxy debil)": 94339,
+          "cultivo": 816
         },
         "pasto": {
-          "other": 12,
-          "bosque": 4,
-          "pasto (proxy debil)": 91,
-          "cultivo": 8
+          "other": 49448,
+          "bosque": 18860,
+          "pasto (proxy debil)": 146488,
+          "cultivo": 5527
         },
         "cultivo": {
-          "other": 2,
-          "bosque": 0,
-          "pasto (proxy debil)": 6,
-          "cultivo": 1
+          "other": 717,
+          "bosque": 42,
+          "pasto (proxy debil)": 2198,
+          "cultivo": 355
         }
       }
     },
-    "cnn": {
-      "agreement_rate": {
-        "bosque": 0.5423728813559322,
-        "pasto": 0.7711864406779662,
-        "cultivo": 0.0
-      },
-      "confusion": {
-        "bosque": {
-          "other": 45,
-          "bosque": 64,
-          "pasto (proxy debil)": 9,
-          "cultivo": 0
-        },
-        "pasto": {
-          "other": 14,
-          "bosque": 4,
-          "pasto (proxy debil)": 91,
-          "cultivo": 9
-        },
-        "cultivo": {
-          "other": 2,
-          "bosque": 0,
-          "pasto (proxy debil)": 3,
-          "cultivo": 0
-        }
-      }
-    },
-    "note": "computed on seed=42's predictions only, not averaged across seeds \u2014 this cross-check isn't the thing under variance investigation. pasto is a weaker proxy than bosque/cultivo \u2014 WorldCover's Grassland class does not distinguish managed pasture from natural grassland (see 07_extract_worldcover.py)."
+    "note": "seed 42's predictions on every scored cell, WorldCover 2021 by nearest neighbour on the 30 m cells; pasto is a weak proxy, WorldCover's grassland does not separate managed pasture"
+  },
+  "test_reference": {
+    "unet": 0.8159268072497208,
+    "rf": 0.8112539952921057
   }
 }

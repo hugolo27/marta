@@ -51,3 +51,5 @@ context.md
 docs/TFM_DRAFT.md
 *.pptx
 thesis/*.pdf
+data/study_area/tiles/data/
+*.npz

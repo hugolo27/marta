@@ -8,7 +8,8 @@ change_map_2019_2023_fnf.npy), in this order of precedence:
                             2019->2023 loss dilated 30 m: omission at edges and where the
                             independent references see loss the map doesn't
   stable_forest, stable_nonforest -- the rest
-Redrawn 2026-10-03, before any point was interpreted (the first draw only had the four map
+Since phase1-segmentation the map is the U-Net's, on 30 m cells; the buffers keep their widths in
+meters (60 m = 2 cells, 30 m = 1 cell). Redrawn 2026-10-03, before any point was interpreted (the first draw only had the four map
 classes, design.md). Strata are no longer the map's classes, so 28_assess_aoi_accuracy.py uses
 the Stehman (2014) estimator throughout, with each point's map class stored in the design file.
 
@@ -18,7 +19,7 @@ Writes three files to data/study_area/accuracy_assessment/:
   aoi_sample.kml         -- same points plus a 0.5 ha square around each, for Google Earth Pro
   aoi_sample_design.csv  -- stratum, inclusion probability and map classes per point; the join
                             file 28_assess_aoi_accuracy.py needs, never opened while labeling
-  aoi_sample_strata.json -- stratum and map-class pixel counts, buffer areas (also label-revealing)
+  aoi_sample_strata.json -- stratum and map-class cell counts, buffer areas (also label-revealing)
 Point ids are shuffled so their order doesn't give the strata away either.
 
 `repeat` (after the first labeling pass) draws a random 20% of every *_sample.csv in the folder
@@ -53,8 +54,10 @@ EXPERIMENT_NAME = "phase1-accuracy-assessment"
 SEED = 42
 REPEAT_FRACTION = 0.20
 ALLOCATION = {"loss": 50, "gain": 40, "discarded_change": 40, "buffer": 30, "stable_forest": 120, "stable_nonforest": 60}
-BUFFER_PX = 6       # 60 m around the final change
-REF_DILATE_PX = 3   # 30 m around Hansen/MapBiomas loss
+BUFFER_M = 60       # around the final change
+REF_DILATE_M = 30   # around Hansen/MapBiomas loss
+BUFFER_PX = BUFFER_M // classify_aoi.PIXEL_M
+REF_DILATE_PX = REF_DILATE_M // classify_aoi.PIXEL_M
 BUFFER_MAX_SHARE = 0.10
 HALF_SIDE_M = np.sqrt(5_000) / 2  # 0.5 ha square, ~70.7 m side
 GRID_N = 5          # 5x5 crown-count crosses inside the square, 4% of the square each
@@ -140,15 +143,15 @@ def main():
     to_wgs84 = pyproj.Transformer.from_crs(meta["utm_crs"], "EPSG:4326", always_xy=True).transform
 
     gee_session.init()
-    refs = score_configs.pull_references(classify_aoi.AOI_PATH, meta)
-    assert refs["hansen_loss"].shape == change.shape, "reference grid differs from the change map"
-    ref_loss = (refs["hansen_loss"] == 1) | ((refs["mb_forest_2019"] == 1) & (refs["mb_forest_2023"] == 0))
+    refs = score_configs.references(meta)
+    assert refs["hansen"].shape == change.shape, "reference grid differs from the change map"
+    ref_loss = refs["hansen"] | refs["mapbiomas"]
 
     frame = inside_aoi(change.shape, meta, aoi)
     strata = build_strata(change, raw, ref_loss, frame)
     valid_px = int(((change != change_map.UNCLASSIFIED) & frame).sum())
     changed = np.isin(change, (change_map.LOSS, change_map.GAIN))
-    buffer_90m_px = int(((within(changed, 9) | within(ref_loss, REF_DILATE_PX)) & (strata != "loss") & (strata != "gain")
+    buffer_90m_px = int(((within(changed, 90 // classify_aoi.PIXEL_M) | within(ref_loss, REF_DILATE_PX)) & (strata != "loss") & (strata != "gain")
                          & (strata != "discarded_change") & (strata != "")).sum())
     alloc, counts = allocate(strata)
     assert counts["buffer"] <= BUFFER_MAX_SHARE * valid_px, f"60 m buffer covers {counts['buffer'] / valid_px:.1%} of the AOI"

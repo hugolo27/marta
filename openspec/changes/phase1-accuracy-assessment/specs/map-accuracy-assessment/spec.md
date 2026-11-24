@@ -85,7 +85,21 @@ The system SHALL re-interpret a random 20% subset of the reference points blind 
 - **WHEN** the repeat interpretation of the subset is complete
 - **THEN** the system reports the agreement rate, lists the disagreeing points with the adjudicated label, and computes final estimates from adjudicated labels only
 
-### Requirement: Assessment sample is not reused for tuning
+### Requirement: Label source comparison
+The system SHALL assess MapBiomas Chaco Collection 5 and MapBiomas Paraguay Collection 3, each remapped to forest/non-forest with a documented legend mapping, against the same reference labels and with the same estimators as the classifier, and SHALL report the agreement between the two collections over the AOI. The comparison SHALL NOT change the training labels.
+
+#### Scenario: Both collections assessed
+- **WHEN** the reference labels of an area have been adjudicated
+- **THEN** the system reports, for each collection next to the classifier, the error matrix, overall accuracy and per-class accuracies with confidence intervals, and in the AOI the error-adjusted loss area with its interval
+
+#### Scenario: Collections disagree with each other
+- **WHEN** the two collections give different forest/non-forest classes on the same AOI cells
+- **THEN** the system reports the agreement rate per class and in 2019-2023 loss, and a map of where they disagree
+
+#### Scenario: One collection is more accurate
+- **WHEN** one collection's accuracy against the reference is higher than the other's
+- **THEN** the result is reported, and any change of training labels is left to a separate change, not taken here
+
 The system SHALL NOT use the reference sample or its results to tune, retrain, or select models, thresholds, or post-processing. The reference labels MAY evaluate a later model version only if the decision to make that change was taken without using this assessment's results; otherwise the system SHALL re-assess on a newly drawn reference sample before reporting accuracy for the changed model.
 
 #### Scenario: Classifier changed in response to the assessment
